@@ -900,6 +900,12 @@ rather than serving the directory statically, and nothing is currently listening
 on that port. The file was therefore **not** publicly served. The exposure route
 was the planned git push, not the web.
 
+**Repository made public 2026-09-06.** This section is therefore world-readable.
+It contains no credential values — every commit was checked — but it does name
+which live credentials were exposed. Rotation was already required; publication
+put a clock on it. **Rotation authorised and in progress from 2026-09-06.**
+Once complete, everything below describes history rather than a live weakness.
+
 **Outstanding — owner action required.** The following must be rotated in their
 respective dashboards by Stella personnel. Claude does not touch live financial
 credentials:
@@ -957,6 +963,7 @@ anything**, because ADR-023 removed the wallet from V1.
 | 2 | **Photographs, credentials, years of practice, specialisations, per-session price** for all three | Phase 2 landing → Razorpay activation | Vasantharaj |
 | 3 | **Cancellation / refund policy**, with the gateway-fee cost modelled | Phase 2 legal pages, Phase 7 refunds | Vasantharaj |
 | 4 | **Non-astrologer admin identity** — the four-eyes rule is void without one, and the contractor cannot be that person | Phase 3 | Vasantharaj |
+| 4b | **Turn on `enforce_admins` on the `main` branch protection** the day Hungry Minds get repository access. Protection currently blocks collaborators but not admins — verified by pushing directly to main and watching it succeed with only a warning. CLAUDE.md §57/§59 are unenforced for admins until this is flipped | when the team joins | Vasantharaj |
 | 5 | **Recruiting owner** — longest-lead item in the project, currently unowned | Phase 4 onward | Vasantharaj |
 | 6 | **Does Razorpay accept the business category?** Astrology sits near their restricted list | Phase 7 — ask before building | Vasantharaj |
 | 7 | **GST: is Stella principal or agent, and what goes on the invoice?** Determines the Phase 6 tax columns | Phase 6 migration | CA |
