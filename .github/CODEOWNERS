@@ -1,0 +1,31 @@
+# Every pull request needs a review from a code owner.
+#
+# CLAUDE.md §59: financial, security, KYC and astrology-engine code needs
+# review before landing. CODEOWNERS is what makes that enforceable rather
+# than a convention someone remembers.
+
+# Default owner for everything.
+*                                   @stellaastro
+
+# ── Paths where a mistake is expensive or hard to undo ──────────
+# Money and payments. Prices and tax figures are frozen at booking and never
+# recomputed, so an error here is not correctable after the fact.
+/services/api/src/common/money.ts   @stellaastro
+/services/api/src/idempotency/      @stellaastro
+
+# Audit log. A gap here is invisible by construction.
+/services/api/src/audit/            @stellaastro
+
+# Schema and migrations. Rollback is restore-from-snapshot (ADR-032), so the
+# cost of a bad migration is every row written since the last backup.
+/services/api/prisma/               @stellaastro
+
+# The decisions themselves, and the file loaded into every future session.
+/docs/architecture/                 @stellaastro
+/CLAUDE.md                          @stellaastro
+/DESIGN.md                          @stellaastro
+
+# CI gates and the guards they enforce. Weakening one of these is how the
+# other controls quietly stop working.
+/.github/workflows/                 @stellaastro
+/scripts/                           @stellaastro
