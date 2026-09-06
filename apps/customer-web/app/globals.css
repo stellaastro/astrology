@@ -1,0 +1,203 @@
+/* Stella Astrology — holding page.
+ *
+ * Built on the real tokens (packages/design-system/tokens.css) so this becomes
+ * the landing page rather than being replaced. Rules from DESIGN.md that are
+ * load-bearing here:
+ *   - gold is ornament only, never text or a fill
+ *   - scroll-linked motion animates transform, never opacity
+ *   - 44px minimum touch targets, visible focus, visited links distinct
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-dev);
+  font-size: var(--step-0);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+:lang(en) { font-family: var(--font-lat); }
+
+h1, h2, h3 {
+  font-family: var(--font-dev);
+  font-weight: 400;
+  line-height: var(--leading-head);
+  margin: 0;
+}
+
+a { color: var(--cta); }
+a:visited { color: var(--visited); }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.wrap {
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding-inline: var(--s3);
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.top {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+.topin {
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding: var(--s2) var(--s3);
+  display: flex;
+  align-items: center;
+}
+.brand { display: flex; align-items: center; gap: .65rem; }
+.brand img { width: 44px; height: 44px; border-radius: 50%; }
+.brand b {
+  font-family: var(--font-lat);
+  font-size: var(--step-1);
+  font-weight: 600;
+  letter-spacing: .07em;
+  display: block;
+  line-height: 1;
+}
+.brand i {
+  font-family: var(--font-lat);
+  font-style: normal;
+  font-size: .62rem;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ── Hero ────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 74vh;
+  display: grid;
+  align-items: center;
+  background: url('/hero.webp') no-repeat right center / cover;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0,
+    var(--surface) 30%,
+    rgba(247, 241, 227, .86) 44%,
+    rgba(247, 241, 227, 0) 62%
+  );
+}
+.heroin {
+  position: relative;
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding: var(--s5) var(--s3);
+  width: 100%;
+}
+.herotext { max-width: 34rem; }
+
+.eyebrow {
+  font-size: .72rem;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 var(--s2);
+}
+.eyebrow::after {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 0;
+  border-top: 1px solid var(--accent);   /* a rule, not a fill */
+  margin-top: .6rem;
+}
+
+h1 { font-size: var(--step-5); margin-bottom: var(--s2); }
+.sub {
+  font-size: var(--step-1);
+  color: var(--ink-soft);
+  margin: 0 0 var(--s3);
+  max-width: 30rem;
+}
+
+.contact {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  gap: .5rem;
+  font-size: var(--step-0);
+}
+
+/* ── Sections ────────────────────────────────────────────────── */
+section { padding-block: var(--s6); }
+.sechead { max-width: 38rem; margin-bottom: var(--s4); }
+.sechead h2 { font-size: var(--step-4); margin-bottom: var(--s2); }
+.sechead p { color: var(--ink-soft); margin: 0; }
+
+#astrologers { border-top: 1px solid var(--rule); }
+
+/* Named people, no fabricated detail. Nothing here is a rating, a count or a
+   testimonial (§13) and nothing is a placeholder dash. */
+.person {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: var(--s3);
+  align-items: baseline;
+  padding-block: var(--s3);
+  border-top: 1px solid var(--rule);
+}
+.person span {
+  font-family: var(--font-lat);
+  font-size: var(--step-2);
+  color: var(--ink-soft);   /* was --accent: 2.96:1, gold is never text */
+  line-height: 1;
+}
+.person h3 { font-size: var(--step-2); margin-bottom: .15rem; }
+.person p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+footer {
+  background: var(--dark-ground);
+  color: var(--dark-soft);
+  padding-block: var(--s5);
+  font-size: var(--step--1);
+}
+footer a { color: var(--dark-text); }
+footer a:visited { color: var(--dark-text); }
+footer .brand b, footer .brand i { color: var(--dark-text); }
+.legal { margin-top: var(--s3); line-height: 1.9; color: #9C8770; }
+
+/* ── Motion: transform only, never opacity ───────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: rise .7s var(--ease) both; }
+  .rise:nth-child(2) { animation-delay: .08s; }
+  .rise:nth-child(3) { animation-delay: .16s; }
+  .rise:nth-child(4) { animation-delay: .24s; }
+  @keyframes rise {
+    from { transform: translateY(14px); }
+    to   { transform: none; }
+  }
+}
+
+/* ── Mobile: the hero composition does not survive portrait ──── */
+@media (max-width: 860px) {
+  .hero { min-height: auto; background: none; display: block; }
+  .hero::before { display: none; }
+  .heroart {
+    display: block;
+    width: 100%;
+    height: 30vh;
+    object-fit: cover;
+    object-position: 72% center;
+  }
+  .heroin { padding: var(--s4) var(--s3); }
+  .person { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }
+}
+@media (min-width: 861px) { .heroart { display: none; } }

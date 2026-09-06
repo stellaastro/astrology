@@ -97,3 +97,9 @@ images/*
 !images/logo
 images/logo/*
 !images/logo/stella.png
+
+# Generated web assets. Derived from images/ by scripts/build-assets.mjs — do
+# not commit them: git keeps binary history forever, and every re-export would
+# add another permanent copy. Run `npm run build:assets` to regenerate.
+apps/customer-web/public/*.webp
+apps/customer-web/public/favicon.png

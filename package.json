@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build:assets": "node scripts/build-assets.mjs",
+    "build": "npm run build:assets && npm run build --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
