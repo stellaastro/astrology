@@ -35,6 +35,12 @@ jobs:
       - name: Fixture containment (ADR-026)
         run: node scripts/no-fixtures-in-prod.mjs
 
+      # Prisma Migrate is forward-only, so there is no "migrate down" to test.
+      # Rollback is restore-from-snapshot (ADR-032). What this checks is the
+      # class of migration that makes a rollback necessary.
+      - name: Migration safety (ADR-032)
+        run: node scripts/migration-check.mjs
+
   test:
     name: Typecheck and tests
     runs-on: ubuntu-latest

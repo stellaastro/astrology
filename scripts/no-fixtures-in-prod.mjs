@@ -45,9 +45,14 @@ const failures = [];
 /* ── 1. Every seed entrypoint must guard on APP_ENV ──────────── */
 for (const file of walk(SEED_DIR)) {
   const text = readFileSync(file, 'utf8');
+  // Accept either comparison direction. The first version of this check only
+  // matched `APP_ENV !== 'development'`, which pushed the seed into writing
+  // its guard in a shape that turned out to be WRONG (an && that let either
+  // variable authorise the run). A lint that dictates syntax it cannot verify
+  // is worse than one that checks for the presence of the guard at all.
   const guards =
-    /APP_ENV\s*!==?\s*['"]development['"]/.test(text) ||
-    /NODE_ENV\s*!==?\s*['"]development['"]/.test(text);
+    /(APP_ENV|NODE_ENV)\s*[!=]==?\s*['"]development['"]/.test(text) ||
+    /['"]development['"]\s*[!=]==?\s*.*(APP_ENV|NODE_ENV)/.test(text);
   if (!guards) {
     failures.push(
       `${relative(ROOT, file)} — seed file has no APP_ENV/NODE_ENV guard. ` +

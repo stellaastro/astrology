@@ -23,7 +23,8 @@
     "gate:contrast": "node scripts/contrast-lint.mjs",
     "gate:i18n": "node scripts/i18n-parity.mjs",
     "gate:fixtures": "node scripts/no-fixtures-in-prod.mjs",
-    "gates": "npm run gate:contrast && npm run gate:i18n && npm run gate:fixtures"
+    "gates": "npm run gate:contrast && npm run gate:i18n && npm run gate:fixtures && npm run gate:migrations",
+    "gate:migrations": "node scripts/migration-check.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

@@ -76,10 +76,16 @@ model Lead {
   ip        String? @db.VarChar(45)
   userAgent String? @map("user_agent") @db.Text
 
+  /// Marks a development seed row (ADR-026). Present in the production schema
+  /// permanently and deliberately: the boot guard cannot detect fixtures
+  /// without a column to look at. Production rows are always false.
+  isDevFixture Boolean @default(false) @map("is_dev_fixture")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([createdAt])
   @@index([referralCode])
+  @@index([isDevFixture])
   @@map("leads")
 }
 

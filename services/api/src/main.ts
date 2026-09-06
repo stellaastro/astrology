@@ -2,8 +2,13 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { initSentry } from './observability/sentry';
 
 async function bootstrap(): Promise<void> {
+  // Before the app is created, so a crash during bootstrap is still reported.
+  // A failure to start is exactly the kind nobody sees until a visitor does.
+  initSentry();
+
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
 
   // nginx proxies /api/v1 WITHOUT stripping the prefix, so the API owns it.
