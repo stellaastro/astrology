@@ -40,12 +40,12 @@ datasource db {
 /// a named person is a Stella customer. That fix requires double opt-in to be
 /// safe, or anyone can squat an address and silently lock out its owner.
 model Lead {
-  id        String   @id @db.Char(26) // ULID
-  email     String   @unique @db.VarChar(320)
-  phone     String?  @db.VarChar(16) // E.164, normalised before write
+  id    String  @id @db.Char(26) // ULID
+  email String  @unique @db.VarChar(320)
+  phone String? @db.VarChar(16) // E.164, normalised before write
 
-  locale    String   @default("hi") @db.VarChar(10)
-  source    String?  @db.VarChar(64)
+  locale       String  @default("hi") @db.VarChar(10)
+  source       String? @db.VarChar(64)
   referralCode String? @map("referral_code") @db.VarChar(32)
 
   utmSource   String? @map("utm_source") @db.VarChar(128)
@@ -58,16 +58,16 @@ model Lead {
   consentPolicyVersion String   @map("consent_policy_version") @db.VarChar(32)
 
   /// Double opt-in (ADR-028). A lead is not contactable until confirmed.
-  confirmedAt      DateTime? @map("confirmed_at")
-  confirmationToken String?  @unique @map("confirmation_token") @db.Char(43)
+  confirmedAt       DateTime? @map("confirmed_at")
+  confirmationToken String?   @unique @map("confirmation_token") @db.Char(43)
 
   /// Set when Turnstile was unreachable and the request was allowed through.
   /// Degrading open keeps signup alive during a bot-check outage; the flag is
   /// how those leads get reviewed later.
   turnstileBypassed Boolean @default(false) @map("turnstile_bypassed")
 
-  ip        String?  @db.VarChar(45)
-  userAgent String?  @map("user_agent") @db.Text
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -86,7 +86,7 @@ model Lead {
 /// transaction rather than logging quietly — a silent audit failure on the
 /// surface built to prove the audit trail works is the worst possible outcome.
 model AuditEvent {
-  id     String @id @db.Char(26)
+  id String @id @db.Char(26)
 
   actorId   String? @map("actor_id") @db.Char(26)
   actorRole String? @map("actor_role") @db.VarChar(32)
@@ -117,13 +117,13 @@ model AuditEvent {
 /// creates two Razorpay orders for one slot is the most likely launch
 /// incident: the slot unique index protects the slot, not the customer's card.
 model IdempotencyKey {
-  key       String   @id @db.VarChar(255)
-  scope     String   @db.VarChar(64)
-  requestHash String @map("request_hash") @db.Char(64)
-  response  Json?
-  status    String   @default("in_progress") @db.VarChar(24)
-  createdAt DateTime @default(now()) @map("created_at")
-  expiresAt DateTime @map("expires_at")
+  key         String   @id @db.VarChar(255)
+  scope       String   @db.VarChar(64)
+  requestHash String   @map("request_hash") @db.Char(64)
+  response    Json?
+  status      String   @default("in_progress") @db.VarChar(24)
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at")
 
   @@index([expiresAt])
   @@map("idempotency_keys")
