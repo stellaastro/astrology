@@ -10,7 +10,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "db:seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} prisma/seeds/dev/index.ts"
+    "db:seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} prisma/seeds/dev/index.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.0",
