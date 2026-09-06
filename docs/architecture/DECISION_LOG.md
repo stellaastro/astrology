@@ -901,10 +901,15 @@ on that port. The file was therefore **not** publicly served. The exposure route
 was the planned git push, not the web.
 
 **Repository made public 2026-09-06.** This section is therefore world-readable.
-It contains no credential values — every commit was checked — but it does name
-which live credentials were exposed. Rotation was already required; publication
-put a clock on it. **Rotation authorised and in progress from 2026-09-06.**
-Once complete, everything below describes history rather than a live weakness.
+It contains no credential values — every commit was checked.
+
+**Rotation deferred by owner decision, 2026-09-06.** It was raised, costed and
+declined for now; the runbook is kept at `CREDENTIAL_ROTATION.md` for whenever
+it is picked up. Recorded here so a future reader knows this was a decision
+rather than an oversight, and so nobody re-opens it as a discovery.
+
+The practical consequence, stated once: nothing below has changed, so the
+listed credentials remain as they were.
 
 **Outstanding — owner action required.** The following must be rotated in their
 respective dashboards by Stella personnel. Claude does not touch live financial

@@ -1,6 +1,7 @@
 # Credential rotation runbook
 
-**Status:** authorised 2026-09-06, in progress
+**Status:** DEFERRED by owner decision, 2026-09-06. Kept for when it is picked
+up. Nothing in this runbook has been carried out.
 **Why now:** the repository is public. It contains no credential values, but it
 names which live credentials were exposed. Rotating makes that a historical
 note rather than a live weakness.
