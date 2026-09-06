@@ -46,14 +46,20 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: percona:8.4
+        # mysql:8.4.11, not percona — Percona publishes no 8.4 image at all,
+        # only 8.0. Production runs Percona Server 8.4.11-11, and matching the
+        # VERSION matters more than matching the fork: ADR-029's generated-column
+        # uniqueness trick is version-sensitive, and testing against 8.0 would
+        # verify behaviour the production server does not have.
+        image: mysql:8.4.11
         env:
           MYSQL_ROOT_PASSWORD: ci
           MYSQL_DATABASE: stella_test
         ports: ['3306:3306']
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -uroot -pci"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci"
           --health-interval=10s --health-timeout=5s --health-retries=10
+          --health-start-period=30s
       redis:
         image: redis:7
         ports: ['6379:6379']
