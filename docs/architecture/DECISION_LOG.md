@@ -826,6 +826,53 @@ plaintext copy of every credential the project holds. It must be in the backup
 set, and the plaintext-on-host arrangement is an interim state pending a secrets
 manager.
 
+### Verified and corrected 2026-09-06 — the promise did not hold as written
+
+This ADR asserted binlogs for point-in-time recovery. **Binary logging was
+explicitly disabled**, so PITR was impossible and the real RPO was 24 hours, not
+the 1 hour §54 claims.
+
+`/etc/mysql/mysql.conf.d/mysqld.cnf` carried `disable_log_bin`. The evidence
+chain, before touching anything: `binlog.000001` and `.000002` dated 9 Aug with
+`binlog.index` listing only those two, while mysqld had restarted 31 Aug 10:36 —
+and a restart always rotates to a new binlog file when logging is on. The absent
+`binlog.000003` was the tell.
+
+**Fixed** (config backed up to `/root/mysqld.cnf.backup.20260906-103159`):
+
+```ini
+server_id = 1
+log_bin = binlog
+binlog_format = ROW
+binlog_row_image = FULL
+binlog_expire_logs_seconds = 1209600   # 14 days
+sync_binlog = 1
+```
+
+Verified by restart: `binlog.000003` was created, `binlog.index` updated, mysqld
+8.4.11 started clean. The stale August files fell outside the 14-day window and
+were purged automatically — the retention policy working on its first run.
+
+### A second finding, not what was being looked for
+
+`innodb_flush_log_at_trx_commit` was **2**: committed transactions went to the OS
+cache and were fsync'd roughly once per second. A host crash or power loss
+silently loses **up to one second of committed transactions**.
+
+That is a defensible tuning choice for a content site. It is the wrong one for a
+system whose ADRs declare financial history immutable and whose Phase 7 takes
+payments — "immutable" is worth little if a commit can evaporate. **Changed to
+1** (fsync at every commit), paired with `sync_binlog = 1` for a fully durable
+configuration. At this transaction volume the write cost is irrelevant;
+correctness is not.
+
+**Not verified at runtime.** `SHOW VARIABLES` could not be run: the MySQL
+credential stored in `config.txt` (`hminds@localhost`) is **rejected** — parsing
+was confirmed correct, so the stored value is stale or was changed outside the
+file. Worth resolving before O1 rotation, or a value that is already wrong gets
+rotated. The config file and a clean start are the evidence for this setting;
+the created binlog file is direct evidence for the other.
+
 ---
 
 ## Security remediation (completed 2026-09-05)
