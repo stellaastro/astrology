@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "tsc --noEmit -p tsconfig.base.json",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "gate:contrast": "node scripts/contrast-lint.mjs",
     "gate:i18n": "node scripts/i18n-parity.mjs",
     "gate:fixtures": "node scripts/no-fixtures-in-prod.mjs",
@@ -27,7 +27,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@swc/core": "^1.16.2",
     "typescript": "^5.7.0",
+    "unplugin-swc": "^1.5.11",
     "vitest": "^2.1.0"
   }
 }
