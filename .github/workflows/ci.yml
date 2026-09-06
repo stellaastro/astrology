@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# CLAUDE.md §57/§59: feature branches, review before landing. These checks are
+# what make that enforceable — set them as required in branch protection or
+# they are decoration.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Design and data gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # No install needed — the gates are dependency-free by design, so a
+      # broken lockfile cannot disable them.
+      - name: Contrast lint (ADR-001, ADR-025)
+        run: node scripts/contrast-lint.mjs
+
+      - name: i18n key parity (ADR-012)
+        run: node scripts/i18n-parity.mjs
+
+      - name: Fixture containment (ADR-026)
+        run: node scripts/no-fixtures-in-prod.mjs
+
+  test:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: percona:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci
+          MYSQL_DATABASE: stella_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -pci"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # THE TEST GATE. The eng review found four lint gates specified and no
+      # test gate — which is the one that actually matters. Do not remove it
+      # to get a build green.
+      - name: Tests
+        run: npm test
+        env:
+          DATABASE_URL: mysql://root:ci@127.0.0.1:3306/stella_test
+          REDIS_URL: redis://127.0.0.1:6379
+          APP_ENV: test
+
+      # Prisma Migrate is forward-only — it generates no down migrations, so
+      # "rollback cleanly" is a silent no-op unless checked explicitly
+      # (ADR: environment notes). This applies the migration to a scratch
+      # database; the down path is verified by restore-from-snapshot in the
+      # deploy runbook, not here.
+      - name: Migrations apply to a clean database
+        run: npm run db:deploy --workspace services/api --if-present
+        env:
+          DATABASE_URL: mysql://root:ci@127.0.0.1:3306/stella_test
+
+  secrets:
+    name: No secrets committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # config.txt held live Razorpay keys inside the document root once
+      # already. This is the tripwire so it cannot happen through git.
+      - name: Scan for credential patterns
+        run: |
+          set -euo pipefail
+          if git grep -nE 'rzp_(live|test)_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}' -- . ':!*.md' ':!.github/workflows/*'; then
+            echo "::error::Credential-shaped string found in tracked files."
+            exit 1
+          fi
+          for f in config.txt .env; do
+            if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+              echo "::error::$f is tracked. Secrets never enter the repo."
+              exit 1
+            fi
+          done
+          echo "No credential patterns in tracked files."

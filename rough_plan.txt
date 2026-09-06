@@ -1,0 +1,2808 @@
+You are the Principal Software Architect, Senior Product Engineer, UI/UX Director, Security Engineer, DevOps Engineer, QA Lead and AI Engineering Lead for the development of:
+
+STELLA ASTROLOGY PVT. LTD.
+
+This is a production-grade astrology consultation platform for India.
+
+You must treat this document as the MASTER SOURCE OF TRUTH for the product direction and architecture.
+
+DO NOT simplify the requirements.
+DO NOT invent missing business rules.
+DO NOT replace selected technologies without architectural justification.
+DO NOT build a superficial demo.
+DO NOT create mock implementations where a real production implementation is required.
+DO NOT start coding blindly.
+
+Before implementation, inspect the existing repository and understand what already exists.
+
+============================================================
+1. BRAND IDENTITY
+============================================================
+
+Company:
+
+STELLA ASTROLOGY PVT. LTD.
+
+Directors:
+
+Shri Ashok Kumar Sharma
+Krishn Kumar Sahu
+
+Registered contact:
+
+7000752736
+
+Registered address:
+
+Ward No. 21, Malviya Ganj Itarsi,
+Dist. Hoshangabad, M. P., India – 461111
+
+Brand positioning:
+
+PRIMARY:
+"Astrology Consultation App"
+
+Core philosophy:
+
+"Ancient Wisdom. Modern Guidance. Better Tomorrow."
+
+The platform combines:
+
+- Vedic Astrology
+- Astrology Consultation
+- Kundli
+- Horoscope
+- Panchang
+- Muhurta
+- Kundli Matching
+- Tarot
+- Numerology
+- Vastu
+- Pooja services
+- Astrology reports
+- Intelligent astrologer discovery
+- Real-time consultation
+- AI-assisted interpretation
+- Wallet/payment
+- Rewards/referrals
+- Content
+- Notifications
+- Admin Command Center
+
+The existing Stella logo must be respected.
+
+The main website should feel:
+
+PREMIUM + TRUSTED + SPIRITUAL + MODERN + TECHNOLOGICAL
+
+Avoid:
+
+- cheap horoscope website aesthetics
+- excessive gradients
+- cartoonish astrology
+- generic SaaS templates
+- excessive glassmorphism
+- excessive gold
+- cluttered UI
+- unnecessary animations
+- fake statistics
+- fake astrologers
+- fake reviews
+
+Use sophisticated visual hierarchy.
+
+============================================================
+3. PRIMARY CUSTOMER JOURNEY
+============================================================
+
+The core funnel is:
+
+FREE VALUE
+    ↓
+Kundli / Horoscope / Panchang / Astrology Tools
+    ↓
+User discovers a personal question
+    ↓
+CONNECT / TALK TO ASTROLOGER
+    ↓
+Intelligent Astrologer Matching
+    ↓
+Chat / Voice / Video
+    ↓
+Real-time billing
+    ↓
+Consultation completion
+    ↓
+Reports / Follow-up / History
+
+The primary conversion CTAs should be:
+
+"Get Free Kundli"
+
+and:
+
+"Connect to an Astrologer"
+
+or:
+
+"Talk to an Astrologer"
+
+Do not aggressively cross-sell unrelated products.
+
+============================================================
+4. PLATFORM APPLICATIONS
+============================================================
+
+Build the ecosystem as:
+
+1. Customer Mobile App
+2. Astrologer Mobile App
+3. Customer Web Application
+4. Admin Command Center
+5. Backend/API Platform
+6. Astrology Calculation Engine
+7. AI Service Layer
+8. Real-time Consultation Service
+9. Wallet & Payment Service
+10. Notification Service
+11. Content/CMS system
+12. Pooja Service
+13. Report Service
+
+============================================================
+5. TECHNOLOGY STACK
+============================================================
+
+CUSTOMER MOBILE:
+
+Flutter
+
+ASTROLOGER MOBILE:
+
+React Native + Expo
+
+WEB:
+
+Next.js
+
+IMPORTANT:
+
+ 
+
+BACKEND:
+
+Node js, Python
+
+DATABASE:
+
+MySQL
+
+QUEUE:
+
+RabbitMQ
+
+STORAGE:
+
+AWS S3
+
+AUTHENTICATION:
+
+Firebase Authentication
+
+PAYMENT:
+
+Razorpay
+
+REAL-TIME:
+
+Agora/WebRTC abstraction
+
+MONITORING:
+
+Sentry + structured application/security logs
+
+CDN / SECURITY:
+
+Cloudflare
+
+WEB SERVER:
+
+Nginx
+
+HOSTING:
+
+Hostinger VPS initially
+
+CI/CD:
+
+GitHub Actions
+
+SOURCE CONTROL:
+
+GitHub
+
+INFRASTRUCTURE:
+
+Docker
+
+Terraform where useful
+
+ASTROLOGY ENGINE:
+
+Hybrid calculation architecture
+
+AI:
+
+Provider abstraction layer
+
+Do not hardcode the entire product to one AI vendor.
+
+============================================================
+6. ARCHITECTURAL STYLE
+============================================================
+
+Use a MODULAR MONOLITH for V1.
+
+Do NOT create unnecessary microservices.
+
+However, design clear service boundaries so modules can be extracted later.
+
+High-level architecture:
+
+Customer Mobile
+Astrologer Mobile
+Customer Web
+Admin Web
+        ↓
+      Nginx
+        ↓
+    FastAPI API
+        ↓
+------------------------------------------------
+AUTH
+USER
+ASTROLOGY
+CONSULTATION
+MATCHING
+WALLET
+PAYMENT
+COMMISSION
+PAYOUT
+REPORT
+POOJA
+AI
+NOTIFICATION
+CONTENT
+ADMIN
+REVIEW
+DISPUTE
+REWARD
+------------------------------------------------
+        ↓
+MySQL
+Redis
+RabbitMQ
+S3
+        ↓
+Third-party providers
+
+============================================================
+7. RECOMMENDED REPOSITORY STRUCTURE
+============================================================
+
+Use a monorepo.
+
+stella-astrology/
+
+├── apps/
+│   ├── customer-mobile/
+│   │   ├── app/
+│   │   ├── src/
+│   │   ├── components/
+│   │   ├── features/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── store/
+│   │   ├── theme/
+│   │   ├── i18n/
+│   │   └── assets/
+│   │
+│   ├── astrologer-mobile/
+│   │   ├── app/
+│   │   ├── src/
+│   │   ├── components/
+│   │   ├── features/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── store/
+│   │   ├── theme/
+│   │   ├── i18n/
+│   │   └── assets/
+│   │
+│   ├── customer-web/
+│   │   ├── public/
+│   │   ├── src/
+│   │   ├── views/
+│   │   ├── components/
+│   │   ├── services/
+│   │   ├── assets/
+│   │   └── routes/
+│   │
+│   └── admin-web/
+│       ├── src/
+│       ├── components/
+│       ├── modules/
+│       ├── services/
+│       ├── layouts/
+│       ├── permissions/
+│       ├── routes/
+│       └── assets/
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config/
+│   │   ├── middleware/
+│   │   ├── dependencies/
+│   │   ├── api/
+│   │   │
+│   │   ├── modules/
+│   │   │   ├── auth/
+│   │   │   ├── users/
+│   │   │   ├── customers/
+│   │   │   ├── astrologers/
+│   │   │   ├── astrology/
+│   │   │   ├── kundli/
+│   │   │   ├── horoscope/
+│   │   │   ├── panchang/
+│   │   │   ├── muhurta/
+│   │   │   ├── matching/
+│   │   │   ├── tarot/
+│   │   │   ├── numerology/
+│   │   │   ├── vastu/
+│   │   │   ├── consultation/
+│   │   │   ├── realtime/
+│   │   │   ├── wallet/
+│   │   │   ├── ledger/
+│   │   │   ├── payments/
+│   │   │   ├── commission/
+│   │   │   ├── payouts/
+│   │   │   ├── reports/
+│   │   │   ├── pooja/
+│   │   │   ├── ai/
+│   │   │   ├── notifications/
+│   │   │   ├── reviews/
+│   │   │   ├── disputes/
+│   │   │   ├── rewards/
+│   │   │   ├── referrals/
+│   │   │   ├── content/
+│   │   │   ├── search/
+│   │   │   ├── analytics/
+│   │   │   └── admin/
+│   │   │
+│   │   ├── core/
+│   │   ├── database/
+│   │   ├── security/
+│   │   ├── events/
+│   │   ├── tasks/
+│   │   └── tests/
+│   │
+│   └── migrations/
+│
+├── packages/
+│   ├── api-contracts/
+│   ├── design-tokens/
+│   ├── shared-types/
+│   ├── astrology-types/
+│   ├── validation/
+│   ├── utilities/
+│   └── config/
+│
+├── infrastructure/
+│   ├── docker/
+│   ├── nginx/
+│   ├── rabbitmq/
+│   ├── redis/
+│   ├── mysql/
+│   ├── terraform/
+│   └── deployment/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   ├── database/
+│   ├── security/
+│   ├── astrology/
+│   ├── payments/
+│   ├── deployment/
+│   └── product/
+│
+├── scripts/
+├── tests/
+├── .github/
+│   └── workflows/
+│
+├── CLAUDE.md
+├── AGENTS.md
+└── README.md
+
+Adapt this structure to the existing repository rather than blindly overwriting existing work.
+
+============================================================
+8. CUSTOMER WEB ROUTING
+============================================================
+
+Create a clean public routing structure.
+
+/
+
+Home
+
+/kundli
+Free Kundli
+
+/kundli/create
+Birth details
+
+/kundli/view/{id}
+
+/consultation
+
+/consultation/instant
+
+/consultation/scheduled
+
+/consultation/{id}
+
+/astrologers
+
+/astrologers/{id}
+
+/astrologers/category/{slug}
+
+/horoscope
+
+/horoscope/daily
+
+/horoscope/weekly
+
+/horoscope/monthly
+
+/horoscope/yearly
+
+/panchang
+
+/muhurta
+
+/match-making
+
+/tarot
+
+/numerology
+
+/vastu
+
+/pooja
+
+/pooja/{slug}
+
+/reports
+
+/reports/{id}
+
+/wallet
+
+/wallet/history
+
+/transactions
+
+/favourites
+
+/following
+
+/profile
+
+/family
+
+/notifications
+
+/settings
+
+/support
+
+/privacy
+
+/terms
+
+============================================================
+9. CUSTOMER WEB MEGA MENU
+============================================================
+
+Navbar:
+
+STELLA logo
+
+Home
+
+Kundli ▼
+
+Consultation
+
+Astrologers
+
+Pooja
+
+More ▼
+
+Login
+
+Sign Up
+
+Mega menu categories:
+
+KUNDLI & REPORTS
+- Free Kundli
+- Birth Chart
+- Match Making
+- Horoscope
+- Panchang
+- Muhurta
+- Varshaphal
+- Custom Reports
+
+CONSULTATION
+- Instant Consultation
+- Chat Consultation
+- Call Consultation
+- Video Consultation
+- Scheduled Appointment
+- Consultation History
+
+ASTROLOGERS
+- Top Astrologers
+- By Language
+- By Expertise
+- Verified Experts
+
+MORE SERVICES
+- Tarot
+- Numerology
+- Vastu
+- Daily Horoscope
+- Blogs & Articles
+
+Every personalized/advanced service should have:
+
+"Connect to an Astrologer"
+
+as an appropriate CTA.
+
+============================================================
+10. CUSTOMER MOBILE NAVIGATION
+============================================================
+
+Bottom navigation:
+
+Home
+Discover
+Consultations
+Wallet
+Profile
+
+Home should prioritize:
+
+- Get Free Kundli
+- Connect to Astrologer
+- Featured astrologers
+- Today's horoscope
+- Panchang
+- Upcoming consultation
+- Recent reports
+- Recommended services
+
+Use mobile-native UX.
+
+Do not simply shrink the website.
+
+============================================================
+11. ASTROLOGER MOBILE APP
+============================================================
+
+Astrologer onboarding:
+
+/onboarding
+/profile
+/kyc
+/expertise
+/languages
+/availability
+/pricing
+/verification
+/dashboard
+
+Main navigation:
+
+Home
+Consultations
+Earnings
+Availability
+Profile
+
+Astrologer dashboard:
+
+- Online/Busy/Offline
+- Current consultation
+- Incoming requests
+- Scheduled appointments
+- Today's earnings
+- Pending earnings
+- Cleared earnings
+- Rating
+- Acceptance rate
+- Response rate
+- Cancellation rate
+- Customer retention
+- Performance
+
+Astrologer status:
+
+ONLINE
+BUSY
+OFFLINE
+
+Do not automatically suspend an astrologer.
+
+Fraud/risk systems should FLAG and escalate to Admin.
+
+============================================================
+12. ADMIN COMMAND CENTER
+============================================================
+
+Admin must be a separate application.
+
+Routes:
+
+/admin
+/admin/dashboard
+/admin/users
+/admin/customers
+/admin/astrologers
+/admin/astrologers/applications
+/admin/astrologers/verification
+/admin/astrologers/kyc
+/admin/astrologers/performance
+/admin/consultations
+/admin/consultations/live
+/admin/wallet
+/admin/transactions
+/admin/payments
+/admin/commission
+/admin/payouts
+/admin/reconciliation
+/admin/reports
+/admin/pooja
+/admin/content
+/admin/horoscope
+/admin/panchang
+/admin/blogs
+/admin/promotions
+/admin/coupons
+/admin/notifications
+/admin/reviews
+/admin/disputes
+/admin/support
+/admin/analytics
+/admin/settings
+/admin/feature-flags
+/admin/security
+/admin/audit-logs
+
+Admin roles:
+
+- Super Admin
+- Operations Admin
+- Astrologer Manager
+- Finance Admin
+- Customer Support
+- Content Admin
+- Pooja Manager
+- Marketing Admin
+- Compliance/KYC Admin
+- Technical Admin
+
+Implement RBAC.
+
+Super Admin has maximum authority.
+
+However:
+
+EVERY privileged Super Admin action MUST be audited.
+
+============================================================
+13. LANDING PAGE
+============================================================
+
+Build a premium landing page inspired by the supplied reference image:
+
+Theme direction:
+
+- Blue sky
+- Mountains
+- Stella gold monogram
+- White/light content surfaces
+- Deep blue navbar
+- Gold CTA
+- Elegant typography
+- Zodiac/celestial motifs
+
+The landing page must support alternative visual themes:
+
+THEME 1:
+Midnight Cosmic
+
+THEME 2:
+Royal Sapphire
+
+THEME 3:
+Sky Mountain
+
+THEME 4:
+Ivory & Gold
+
+THEME 5:
+Twilight Purple
+
+Use the design system so theme variations can be implemented without rewriting components.
+
+Hero:
+
+Headline examples:
+
+"Ancient Wisdom.
+Modern Guidance.
+Better Tomorrow."
+
+or:
+
+"Guiding You
+Towards a
+Better Life."
+
+Supporting message:
+
+"Experience the magic of Vedic astrology with technology and trusted experts."
+
+Primary CTA:
+
+Get Free Kundli
+
+Secondary CTA:
+
+Connect to an Astrologer
+
+Hero imagery:
+
+- Stella logo
+- zodiac wheel
+- mountain/cosmic scene
+- subtle stars
+- lotus
+
+Trust indicators:
+
+- Trusted Astrologers
+- Secure & Private
+- Accurate Predictions
+- 24/7 Support
+
+Do NOT invent user numbers or ratings.
+
+Use placeholders only where real production data is unavailable.
+
+============================================================
+14. KUNDLI
+============================================================
+
+Free Kundli includes:
+
+- D1 chart
+- Planetary positions
+- Houses
+- Rashi
+- Nakshatra
+- Basic Dasha
+- Doshas
+- Basic interpretation
+
+Advanced interpretation should provide:
+
+CONNECT TO ASTROLOGER
+
+The user should be able to save multiple family profiles.
+
+Store calculation metadata:
+
+- Engine version
+- Ephemeris
+- Ayanamsa
+- Coordinates
+- Timezone
+- Calculation parameters
+- Timestamp
+
+Astrology calculations must be reproducible.
+
+============================================================
+15. ASTROLOGY ENGINE
+============================================================
+
+Use a hybrid architecture.
+
+Primary calculation engine:
+
+Internal professional-grade calculation service.
+
+External/reference calculation providers:
+
+Used for validation/reference where required.
+
+Support:
+
+- Vedic astrology
+- Lahiri ayanamsa
+- Divisional charts
+- Dashas
+- Transits
+- Panchang
+- Muhurta
+- Kundli matching
+- Nakshatra
+- Rashi
+- Houses
+- Planetary positions
+- Doshas
+- Varshaphal
+- Compatibility
+
+Every engine version must have validation tests.
+
+Never allow an AI model to calculate planetary positions itself.
+
+AI can interpret structured astrology data.
+
+============================================================
+16. HOROSCOPE
+============================================================
+
+Support:
+
+- Daily
+- Weekly
+- Monthly
+- Yearly
+
+Personalization:
+
+- Moon sign
+- Full birth chart
+
+Content model:
+
+Astrologer-authored base content
++
+AI personalization
+
+AI must not invent astrological calculations.
+
+============================================================
+17. KUNDLI MATCHING
+============================================================
+
+Support detailed compatibility.
+
+Include:
+
+- Ashtakoota
+- Guna matching
+- Dosha analysis
+- Planetary compatibility
+- Detailed interpretation
+
+Primary result:
+
+Compatibility report
+
+Secondary CTA:
+
+Connect to an Astrologer
+
+============================================================
+18. TAROT
+============================================================
+
+Do not build Tarot merely as a static content page.
+
+Create structured Tarot experience:
+
+Question
+↓
+Choose spread
+↓
+Card draw
+↓
+Card meaning
+↓
+Interpretation
+↓
+Connect to Astrologer
+
+The automated Tarot experience must clearly distinguish automated interpretation from human consultation.
+
+============================================================
+19. NUMEROLOGY
+============================================================
+
+V1:
+
+Basic Life Path Number.
+
+Do not build an unnecessarily huge Numerology platform initially.
+
+Provide:
+
+"Connect to an Astrologer"
+
+for advanced reports.
+
+============================================================
+20. VASTU
+============================================================
+
+Support:
+
+- Vastu questionnaire
+- Basic Vastu analysis
+- Floor plan upload
+- Expert consultation
+
+User journey:
+
+Upload floor plan
+↓
+Basic analysis
+↓
+Connect to Vastu Astrologer
+
+============================================================
+21. POOJA
+============================================================
+
+V1 should be simple.
+
+No physical product logistics.
+
+No Prasad marketplace.
+
+No Pooja-kit marketplace.
+
+No complex delivery infrastructure.
+
+Pooja can be initiated through:
+
+- Pooja listing
+- Details
+- Request/booking
+- Connect to Astrologer
+- Consultation/call
+- Status tracking
+
+Pooja is primarily an astrologer-assisted service.
+
+============================================================
+22. REPORTS
+============================================================
+
+Support:
+
+- Birth report
+- Career
+- Marriage
+- Finance
+- Education
+- Child
+- Annual
+- Transit
+- Dasha
+- Compatibility
+- Custom reports
+
+Reports should be accessible from the user's report vault.
+
+Do not create an unnecessary independent report pricing architecture if the service/pricing system already handles it.
+
+============================================================
+23. CONSULTATION ENGINE
+============================================================
+
+Support:
+
+Instant:
+
+- Chat
+- Voice
+- Video
+
+Scheduled:
+
+- Chat
+- Voice
+- Video
+
+Workflow:
+
+Customer Request
+↓
+Astrologer Matching
+↓
+Acceptance
+↓
+Connection
+↓
+Billing
+↓
+Consultation
+↓
+Completion
+↓
+Review
+↓
+Settlement
+
+Customer can terminate anytime.
+
+IMPORTANT:
+
+Customer termination means:
+
+ACTUAL USAGE IS BILLED.
+
+Unused reserved funds are released.
+
+Astrologer cancellation:
+
+FULL REFUND.
+
+If astrologer does not accept:
+
+Find another astrologer.
+
+Customer can choose another astrologer.
+
+============================================================
+24. INTELLIGENT ASTROLOGER MATCHING
+============================================================
+
+Matching should consider:
+
+- Expertise
+- Language
+- Rating
+- Availability
+- Price
+- Customer history
+- Response time
+- Acceptance rate
+- Retention
+- Current queue
+- Customer preferences
+- Astrologer tier
+
+Do not introduce paid sponsored ranking initially.
+
+Ranking should be merit-based.
+
+============================================================
+25. REAL-TIME CONSULTATION
+============================================================
+
+Provider abstraction:
+
+Create:
+
+RealtimeProvider interface
+
+Possible implementation:
+
+Agora
+
+Future providers can be added without rewriting consultation logic.
+
+Use short-lived signed session credentials.
+
+Never expose provider secrets to mobile clients.
+
+Call drop:
+
+Reconnect
++
+Pause billing where applicable
++
+Reconcile duration
+
+Billing must be server authoritative.
+
+============================================================
+26. WALLET
+============================================================
+
+Do NOT implement wallet as:
+
+users.balance
+
+Instead use:
+
+Wallet
++
+Ledger
++
+Transaction
++
+Settlement
+
+The financial architecture must support:
+
+- Credit
+- Debit
+- Hold
+- Release
+- Refund
+- Promotional credit
+- Consultation charge
+- Recharge
+- Settlement
+- Payout
+- Adjustment
+
+Use atomic database transactions.
+
+Use idempotency.
+
+Use row-level locking where required.
+
+Financial records should use append-only ledger events.
+
+Corrections must use compensating transactions.
+
+Do not edit historical financial events.
+
+============================================================
+27. PAYMENT
+============================================================
+
+Razorpay.
+
+Support:
+
+- Wallet recharge
+- Payment status
+- Refund
+- Payment reconciliation
+- Webhooks
+- Auto-recharge where legally/provider supported
+
+Webhook processing:
+
+Signature verification
++
+Idempotency
++
+Replay protection
++
+State reconciliation
+
+NEVER trust the client to declare payment success.
+
+Server must verify payment state.
+
+IMPORTANT:
+
+Before implementing stored-value wallet/automatic recharge for production, document the payment/regulatory assumptions and flag anything requiring confirmation with Razorpay/payment/legal advisors.
+
+Do not make legal conclusions yourself.
+
+============================================================
+28. AUTO-RECHARGE
+============================================================
+
+Configured by customer.
+
+Example:
+
+Balance falls below minimum threshold
+↓
+Auto-recharge
+↓
+If successful → continue
+If failed → retry
+↓
+Grace period
+↓
+Terminate consultation if required
+
+Never charge without the payment provider's supported authorization/mandate mechanism.
+
+============================================================
+29. COMMISSION
+============================================================
+
+Admin-controlled rules engine.
+
+Rules can vary by:
+
+- Service
+- Astrologer
+- Tier
+- Duration
+- Campaign
+- Promotion
+
+Astrologer sees transparent settlement:
+
+Customer payment
+-
+Platform commission
+-
+Adjustments
+=
+Astrologer payable
+
+Commission changes are privileged operations.
+
+============================================================
+30. ASTROLOGER EARNINGS
+============================================================
+
+Lifecycle:
+
+PENDING
+↓
+CLEARED
+↓
+WITHDRAWABLE
+↓
+PAID
+
+Payout:
+
+Automated + exception handling.
+
+KYC must be completed before earning/payout.
+
+Bank/payout account must be verified.
+
+============================================================
+31. KYC
+============================================================
+
+Astrologer KYC workflow:
+
+Application
+↓
+Profile
+↓
+Documents
+↓
+Verification
+↓
+Practical/Test Consultation
+↓
+Approval
+
+Tiers:
+
+- Basic
+- Verified
+- Premium
+
+Tier criteria:
+
+- Rating
+- Experience
+- Consultation count
+- Retention
+- Complaint rate
+- Response rate
+- Acceptance rate
+- Performance
+
+Do not automatically suspend astrologers.
+
+Admin controls suspension.
+
+KYC files:
+
+Private S3.
+
+Never expose public S3 URLs.
+
+============================================================
+32. AI
+============================================================
+
+AI is NOT an independent astrologer.
+
+AI can:
+
+- Explain astrology concepts
+- Interpret structured calculations
+- Personalize approved content
+- Summarize data
+- Assist reports
+- Assist customer support
+- Assist matching
+- Assist fraud detection
+- Assist content generation
+
+AI MUST NOT:
+
+- Invent planetary positions
+- Invent consultation history
+- Change matter/profile facts
+- Claim medical certainty
+- Claim financial certainty
+- Claim guaranteed outcomes
+- Predict death with certainty
+- Make dangerous medical/legal/financial claims
+
+AI architecture:
+
+AI Service
+↓
+Provider abstraction
+↓
+Model providers
+
+Never hard-code business logic to a single AI provider.
+
+AI access to personal data must be explicitly authorized and least-privilege.
+
+User can delete AI conversation history.
+
+============================================================
+33. AI ESCALATION
+============================================================
+
+When a customer needs personalized expert guidance:
+
+AI/feature
+↓
+"Connect to an Astrologer"
+↓
+Intelligent matching
+↓
+Appropriate astrologer
+
+Examples:
+
+Marriage question
+→ Marriage/Relationship expert
+
+Career question
+→ Career expert
+
+Vastu question
+→ Vastu expert
+
+Tarot question
+→ Tarot expert
+
+============================================================
+34. CUSTOMER DATA
+============================================================
+
+Customer owns personal data.
+
+Stella is the service/platform custodian.
+
+Sensitive data access must be controlled.
+
+Birth information visibility:
+
+Customer
++
+authorized astrologer
++
+authorized Stella personnel where operationally required
+
+Family profiles:
+
+User can create multiple profiles.
+
+Deletion:
+
+Allowed subject to legal/financial retention requirements.
+
+============================================================
+35. PRIVACY
+============================================================
+
+Implement:
+
+- Privacy policy version tracking
+- Consent tracking
+- Marketing preferences
+- Recording consent
+- AI consent where applicable
+- Location consent
+- Notification preferences
+- Data export
+- Account deletion workflow
+
+Marketing preferences:
+
+WhatsApp
+SMS
+Email
+Push
+
+Track consent by:
+
+Purpose
+Channel
+Timestamp
+Policy version
+Source
+Withdrawal
+
+============================================================
+36. SECURITY
+============================================================
+
+Security is a first-class architectural concern.
+
+Use:
+
+- HTTPS/TLS
+- Secure password hashing
+- Firebase Authentication
+- Token revocation
+- OTP expiry
+- OTP attempt limits
+- Rate limiting
+- Device/session controls
+- RBAC
+- Least privilege
+- Secure headers
+- Input validation
+- Output filtering
+- CSRF protection where applicable
+- SQL injection prevention
+- XSS protection
+- Secure file uploads
+- Private S3
+- Encrypted backups
+- Secret management
+- Audit logs
+- Sentry
+- Security event logs
+
+Super Admin:
+
+Mandatory MFA.
+
+Critical operations:
+
+Re-authentication.
+
+Examples:
+
+- Wallet freeze
+- Large refund
+- Commission change
+- Payout override
+- KYC override
+- Security configuration
+
+============================================================
+37. ADMIN AUDIT
+============================================================
+
+Audit:
+
+WHO
+WHAT
+WHEN
+WHERE
+BEFORE
+AFTER
+IP
+SESSION
+REASON
+
+Audit events must be append-only/tamper-evident.
+
+Do NOT allow ordinary editing of audit events.
+
+Financial ledger is immutable.
+
+Corrections use compensating entries.
+
+============================================================
+38. ADMIN DASHBOARD
+============================================================
+
+Command Center should show:
+
+- Users online
+- Astrologers online
+- Active consultations
+- Revenue
+- Wallet activity
+- Payments
+- Refunds
+- Payouts
+- Complaints
+- Failed payments
+- KYC queue
+- Pooja requests
+- Live sessions
+- System health
+- AI usage
+- Support queue
+
+Do not expose private consultation content merely because Admin has operational visibility.
+
+Sensitive content access must be controlled and audited.
+
+============================================================
+39. SUPPORT
+============================================================
+
+Support:
+
+- Tickets
+- Live support
+- AI first-level support
+- Human escalation
+
+Disputes:
+
+Full dispute workflow.
+
+Support can access only the information necessary for resolution.
+
+============================================================
+40. REVIEWS
+============================================================
+
+Support:
+
+- Ratings
+- Reviews
+- Moderation
+- Fraud detection
+
+Use AI-assisted suspicious pattern detection.
+
+Do not automatically punish an astrologer based solely on AI suspicion.
+
+Flag → Admin review.
+
+============================================================
+41. CONTENT CMS
+============================================================
+
+Admin-managed:
+
+- Horoscope
+- Articles
+- Panchang
+- Festivals
+- Muhurta
+- FAQs
+- Pooja
+- Banners
+- Promotions
+- Notifications
+
+Astrologer content:
+
+Submit
+↓
+Moderation
+↓
+Approval
+↓
+Publish
+
+AI can assist content creation.
+
+Human editorial approval required.
+
+============================================================
+42. NOTIFICATIONS
+============================================================
+
+Support:
+
+- Push
+- Email
+- SMS
+- WhatsApp where supported
+
+Events:
+
+- Consultation request
+- Consultation accepted
+- Consultation reminder
+- Consultation completed
+- Wallet recharge
+- Low balance
+- Payment
+- Refund
+- Payout
+- KYC
+- Appointment
+- New report
+- Promotions
+
+Support:
+
+Manual
+Scheduled
+Segmented
+
+============================================================
+43. CUSTOMER SEGMENTATION
+============================================================
+
+Support intelligent segments:
+
+- New customer
+- Active customer
+- Consultation customer
+- Pooja customer
+- Kundli user
+- Frequent customer
+- Inactive customer
+- Premium/high-value customer
+
+Use segmentation for relevant notifications.
+
+Do not use manipulative marketing.
+
+============================================================
+44. REWARDS / REFERRALS
+============================================================
+
+Support:
+
+- Referral
+- Promotional credits
+- Coupons
+- Festival campaigns
+- First consultation offers
+
+Do not create a complicated loyalty economy in V1.
+
+============================================================
+45. MULTI-LANGUAGE
+============================================================
+
+Use full i18n architecture.
+
+Do not hardcode UI text.
+
+Architecture should support:
+
+- English
+- Hindi
+- Future Indian languages
+
+Store translation keys.
+
+RTL is not required initially unless later needed.
+
+============================================================
+46. ACCESSIBILITY
+============================================================
+
+Build strong accessibility.
+
+Consider:
+
+- WCAG principles
+- Keyboard navigation
+- Screen readers
+- Color contrast
+- Focus states
+- Touch target sizes
+- Semantic HTML
+- Reduced motion
+- Accessible forms
+- Accessible charts
+
+============================================================
+47. SEARCH
+============================================================
+
+V1:
+
+MySQL search where appropriate.
+
+Search:
+
+- Astrologers
+- Expertise
+- Languages
+- Services
+- Articles
+- Reports
+- Pooja
+
+Architecture should allow future Elasticsearch/OpenSearch migration.
+
+============================================================
+48. ANALYTICS
+============================================================
+
+V1:
+
+Basic analytics.
+
+Track:
+
+- Registration
+- Kundli creation
+- Astrologer discovery
+- Consultation start
+- Consultation completion
+- Recharge
+- Refund
+- Report generation
+- Pooja request
+- Referral
+- Retention
+
+Future:
+
+CAC
+LTV
+ARPU
+Conversion
+Churn
+Astrologer utilization
+Revenue/service
+Revenue/astrologer
+
+============================================================
+49. DATABASE
+============================================================
+
+Use MySQL.
+
+Strong module boundaries.
+
+Suggested domains:
+
+users
+profiles
+family_profiles
+astrologers
+astrologer_expertise
+astrologer_languages
+astrologer_availability
+astrologer_kyc
+astrologer_tiers
+
+astrology_calculations
+astrology_engine_versions
+birth_profiles
+kundlis
+planetary_positions
+dashas
+divisional_charts
+panchang
+muhurta
+matching_reports
+
+consultations
+consultation_participants
+consultation_sessions
+consultation_events
+consultation_usage
+consultation_recordings
+
+wallets
+wallet_transactions
+ledger_accounts
+ledger_entries
+payment_orders
+payment_events
+refunds
+payouts
+commission_rules
+commission_entries
+
+reports
+report_templates
+report_instances
+
+pooja_services
+pooja_requests
+
+tarot_sessions
+tarot_cards
+tarot_readings
+
+numerology_profiles
+vastu_requests
+vastu_reports
+
+reviews
+disputes
+support_tickets
+
+notifications
+notification_preferences
+
+coupons
+promotions
+referrals
+reward_credits
+
+content
+articles
+horoscopes
+festivals
+faqs
+
+admin_users
+roles
+permissions
+audit_events
+security_events
+
+feature_flags
+system_settings
+
+Use UUIDs or robust identifiers where appropriate.
+
+Never expose sequential internal IDs unnecessarily.
+
+============================================================
+50. API ROUTING
+============================================================
+
+Use versioned APIs.
+
+Example:
+
+/api/v1/auth/*
+/api/v1/users/*
+/api/v1/customers/*
+/api/v1/astrologers/*
+/api/v1/astrology/*
+/api/v1/kundli/*
+/api/v1/horoscope/*
+/api/v1/panchang/*
+/api/v1/muhurta/*
+/api/v1/matching/*
+/api/v1/tarot/*
+/api/v1/numerology/*
+/api/v1/vastu/*
+/api/v1/consultations/*
+/api/v1/realtime/*
+/api/v1/wallet/*
+/api/v1/payments/*
+/api/v1/commission/*
+/api/v1/payouts/*
+/api/v1/reports/*
+/api/v1/pooja/*
+/api/v1/ai/*
+/api/v1/notifications/*
+/api/v1/content/*
+/api/v1/reviews/*
+/api/v1/disputes/*
+/api/v1/rewards/*
+/api/v1/referrals/*
+/api/v1/admin/*
+
+Use OpenAPI-first contracts.
+
+Pydantic schemas.
+
+Strict validation.
+
+Never expose database models directly.
+
+============================================================
+51. REAL-TIME BILLING
+============================================================
+
+Server authoritative.
+
+Do not bill based on mobile timers.
+
+Maintain:
+
+consultation_start
+consultation_pause
+consultation_resume
+consultation_end
+billable_seconds
+rate
+amount
+ledger_event
+
+The server calculates final billable usage.
+
+Provider events are reconciled.
+
+============================================================
+52. DEVICE POLICY
+============================================================
+
+Customer:
+
+One active device.
+
+However implement:
+
+Secure device registration
++
+replacement workflow
++
+session revocation.
+
+Do not rely on raw device ID as the only security mechanism.
+
+============================================================
+53. INFRASTRUCTURE
+============================================================
+
+Initial deployment:
+
+Hostinger VPS.
+
+Nginx
+Docker
+FastAPI
+MySQL
+Redis
+RabbitMQ
+
+S3 external storage.
+
+Cloudflare in front.
+
+Use separate configuration for:
+
+development
+staging/non-production
+production
+
+Do not allow autonomous AI deployment directly to production.
+
+============================================================
+54. BACKUP / DISASTER RECOVERY
+============================================================
+
+Target:
+
+10,000 registered users.
+
+Initial design:
+
+RPO:
+≤ 1 hour
+
+RTO:
+≤ 4 hours
+
+Automated encrypted backups.
+
+Test restoration periodically.
+
+Manual failover is acceptable initially.
+
+Do not overengineer multi-region infrastructure in V1.
+
+============================================================
+55. PERFORMANCE TARGET
+============================================================
+
+Initial target:
+
+10,000 registered users.
+
+Design for approximately:
+
+1,000 concurrent consultation sessions.
+
+Actual media traffic should be handled by the realtime provider.
+
+Use:
+
+Redis
+RabbitMQ
+database indexing
+connection pooling
+background jobs
+caching
+pagination
+lazy loading
+CDN
+
+Do not introduce Kubernetes or a large microservice infrastructure without a demonstrated need.
+
+============================================================
+56. DEVELOPMENT METHODOLOGY
+============================================================
+
+Build using VERTICAL SLICES.
+
+Do NOT build:
+
+"all backend first"
+
+or:
+
+"all frontend first".
+
+Example:
+
+SLICE:
+
+Astrologer onboarding
+
+Backend
+↓
+Admin
+↓
+Astrologer mobile
+↓
+Customer discovery
+↓
+Tests
+↓
+Security review
+
+Then next slice.
+
+============================================================
+57. GIT WORKFLOW
+============================================================
+
+IMPORTANT CORRECTION:
+
+Do NOT commit feature work directly to main.
+
+Use:
+
+feature/*
+↓
+implementation
+↓
+tests
+↓
+GStack review
+↓
+Codex cross-review
+↓
+CI
+↓
+human review
+↓
+PR
+↓
+main
+
+Production branches must be protected.
+
+============================================================
+58. CLAUDE CODE RULES
+============================================================
+
+Claude Code must:
+
+1. Inspect repository first.
+2. Identify existing code.
+3. Identify existing database schema.
+4. Identify existing integrations.
+5. Avoid unnecessary rewrites.
+6. Preserve working functionality.
+7. Create a change plan before large changes.
+8. Never modify critical financial logic casually.
+9. Never fabricate APIs.
+10. Never use fake payment success.
+11. Never use fake astrology calculations.
+12. Never hardcode secrets.
+13. Never expose credentials.
+14. Never put business logic only in frontend.
+15. Never bypass authorization.
+16. Never bypass audit logging.
+17. Never silently alter database schema.
+18. Create migrations.
+19. Test migrations.
+20. Update documentation.
+
+============================================================
+59. PROTECTED MODULES
+============================================================
+
+The following require additional review:
+
+FINANCIAL:
+
+- Wallet
+- Ledger
+- Payments
+- Refunds
+- Commission
+- Payouts
+- Reconciliation
+
+SECURITY:
+
+- Authentication
+- Authorization
+- KYC
+- Device management
+- Session management
+- Secrets
+
+ASTROLOGY:
+
+- Calculation engine
+- Ephemeris
+- Ayanamsa
+- Dasha
+- Panchang
+- Matching
+
+DATABASE:
+
+- Migrations
+- Financial tables
+- Identity tables
+
+============================================================
+60. GSTACK REVIEW AGENTS
+============================================================
+
+Create/use specialized review capabilities for:
+
+1. Architecture
+2. Security
+3. Database
+4. Payments
+5. Wallet
+6. Astrology engine
+7. API
+8. UI/UX
+9. Accessibility
+10. Performance
+11. Mobile
+12. DevOps
+13. Testing
+14. Privacy
+15. AI safety
+
+Every critical module should receive appropriate review.
+
+============================================================
+61. CODEX CROSS REVIEW
+============================================================
+
+Use Claude Code and Codex as complementary reviewers.
+
+If they disagree:
+
+DO NOT choose one automatically.
+
+Use:
+
+Evidence
++
+Tests
++
+Architecture rules
++
+Human decision
+
+as the final authority.
+
+============================================================
+62. TESTING
+============================================================
+
+Required:
+
+Unit tests
+Integration tests
+E2E tests where relevant
+API tests
+Database tests
+Security tests
+Payment tests
+Wallet concurrency tests
+Astrology reference tests
+Mobile tests
+Web tests
+
+Before production:
+
+Load testing.
+
+Target:
+
+10K registered users
+~1K concurrent consultation sessions
+
+============================================================
+63. WALLET TEST CASES
+============================================================
+
+Test:
+
+- Recharge
+- Duplicate recharge
+- Failed payment
+- Webhook retry
+- Refund
+- Consultation debit
+- Concurrent consultation debit
+- Auto-recharge
+- Insufficient balance
+- Grace period
+- Settlement
+- Payout
+- Commission
+- Ledger reconciliation
+
+Financial correctness is more important than development speed.
+
+============================================================
+64. ASTROLOGY TEST CASES
+============================================================
+
+Maintain known reference charts.
+
+For every engine change compare:
+
+- Planet positions
+- Houses
+- Nakshatra
+- Dasha
+- Divisional charts
+- Panchang
+- Matching
+
+Calculation changes must be versioned.
+
+============================================================
+65. DESIGN SYSTEM
+============================================================
+
+Create shared design tokens.
+
+Brand:
+
+Primary:
+Midnight Navy
+
+Secondary:
+Royal/Sapphire Blue
+
+Accent:
+Antique Gold
+
+Supporting:
+Ivory
+Cream
+Sky Blue
+White
+
+Typography:
+
+Premium serif for major astrology/brand headlines.
+
+Clean sans-serif for UI.
+
+Create:
+
+Buttons
+Cards
+Inputs
+Dropdowns
+Mega menus
+Tabs
+Charts
+Kundli components
+Astrology cards
+Astrologer cards
+Consultation controls
+Wallet components
+Report cards
+Notification cards
+Modal/dialog system
+
+Use consistent radius, spacing, shadows and typography.
+
+============================================================
+66. LANDING PAGE SECTIONS
+============================================================
+
+Build:
+
+1. Navbar
+2. Mega menu
+3. Hero
+4. Trust indicators
+5. Free Kundli section
+6. How Stella works
+7. Featured astrologers
+8. Astrology services
+9. Consultation modes
+10. Kundli/Report section
+11. Panchang/Horoscope
+12. Pooja
+13. Tarot/Numerology/Vastu
+14. AI-assisted guidance
+15. Security/privacy
+16. Testimonials only when real data exists
+17. FAQ
+18. Final Connect CTA
+19. Footer
+
+Primary visual hero should use the supplied Stella mountain/blue/gold direction.
+
+============================================================
+67. HOMEPAGE HERO
+============================================================
+
+Preferred direction:
+
+LEFT:
+
+"Guiding You
+Towards a
+Better Life."
+
+or:
+
+"Ancient Wisdom.
+Modern Guidance.
+Better Tomorrow."
+
+Supporting:
+
+"Vedic astrology, modern technology, and trusted experts."
+
+Buttons:
+
+Get Free Kundli
+Connect to an Astrologer
+
+RIGHT:
+
+Large Stella S/A logo.
+
+Background:
+
+Blue mountain landscape.
+
+Subtle zodiac/celestial graphics.
+
+Gold accents.
+
+Do not overcrowd the hero.
+
+============================================================
+68. MOBILE HOME
+============================================================
+
+Mobile-first hierarchy:
+
+Logo
+Profile/notification
+
+Hero
+
+Get Free Kundli
+
+Connect to Astrologer
+
+Today's Horoscope
+
+Featured Astrologers
+
+Quick Services
+
+Upcoming Consultation
+
+Recent Reports
+
+Panchang
+
+Personalized insights
+
+Bottom navigation.
+
+============================================================
+69. ADMIN DESIGN
+============================================================
+
+Admin must visually differ from the consumer app.
+
+Use:
+
+Dark navy
+White
+Gold accents
+Data-dense but clean dashboard
+
+Prioritize:
+
+Operational clarity
+Tables
+Filters
+Status chips
+Charts
+Queues
+Alerts
+Actions
+
+Avoid unnecessary decorative astrology graphics in Admin.
+
+============================================================
+70. MOBILE ASTROLOGER DESIGN
+============================================================
+
+Astrologer app should prioritize:
+
+Current status
+Incoming consultation
+Earnings
+Schedule
+Customers
+Performance
+Profile/KYC
+
+Large touch targets.
+
+Fast actions.
+
+Reliable network handling.
+
+Offline-safe local state where appropriate.
+
+============================================================
+71. NO MOCK DATA IN PRODUCTION
+============================================================
+
+During development, mocks may be used only behind explicit development adapters.
+
+Never allow:
+
+mock astrologers
+mock wallet balance
+fake payment success
+fake consultation billing
+fake astrology calculations
+
+to reach production.
+
+Use seeded development data clearly marked as DEV.
+
+============================================================
+72. DOCUMENTATION
+============================================================
+
+Maintain:
+
+/docs/architecture
+/docs/database
+/docs/api
+/docs/security
+/docs/payments
+/docs/astrology
+/docs/deployment
+/docs/product
+
+Create:
+
+ARCHITECTURE.md
+DATABASE.md
+API.md
+SECURITY.md
+PAYMENTS.md
+ASTROLOGY_ENGINE.md
+DEPLOYMENT.md
+DEVELOPMENT.md
+
+Update documentation whenever architecture changes.
+
+============================================================
+73. IMPLEMENTATION PHASES
+============================================================
+
+Do NOT implement all modules at once.
+
+Use:
+
+PHASE 0
+Repository audit + architecture
+
+PHASE 1
+Foundation
+
+PHASE 2
+Authentication + users
+
+PHASE 3
+Astrologer onboarding/KYC
+
+PHASE 4
+Astrology engine + Free Kundli
+
+PHASE 5
+Astrologer discovery + matching
+
+PHASE 6
+Consultation chat
+
+PHASE 7
+Voice/video
+
+PHASE 8
+Wallet/payment/ledger
+
+PHASE 9
+Commission/payout
+
+PHASE 10
+Reports
+
+PHASE 11
+Horoscope/Panchang/Muhurta
+
+PHASE 12
+Kundli Matching
+
+PHASE 13
+Tarot/Numerology/Vastu
+
+PHASE 14
+Pooja
+
+PHASE 15
+AI
+
+PHASE 16
+CMS/content
+
+PHASE 17
+Notifications/rewards/referrals
+
+PHASE 18
+Admin Command Center
+
+PHASE 19
+Analytics/support/disputes
+
+PHASE 20
+Security hardening
+
+PHASE 21
+Load testing
+
+PHASE 22
+Controlled beta
+
+PHASE 23
+Phased production rollout
+
+============================================================
+74. PHASE 0 — MANDATORY FIRST STEP
+============================================================
+
+Before writing production code:
+
+1. Inspect the complete repository.
+2. Detect framework(s).
+3. Detect existing applications.
+4. Detect existing backend.
+5. Detect database.
+6. Detect migrations.
+7. Detect authentication.
+8. Detect existing APIs.
+9. Detect existing UI.
+10. Detect existing assets.
+11. Detect existing logo files.
+12. Detect existing environment configuration.
+13. Detect deployment configuration.
+14. Detect existing tests.
+15. Detect technical debt.
+
+Then create:
+
+docs/architecture/REPOSITORY_AUDIT.md
+
+and:
+
+docs/architecture/IMPLEMENTATION_PLAN.md
+
+Also create:
+
+docs/architecture/DECISION_LOG.md
+
+Do NOT start major implementation until the audit and plan are complete.
+
+============================================================
+75. ARCHITECTURAL DECISION RULE
+============================================================
+
+When encountering uncertainty:
+
+DO NOT silently guess.
+
+Classify it:
+
+A. Product ambiguity
+B. Technical ambiguity
+C. Payment/legal ambiguity
+D. Astrology methodology ambiguity
+E. Existing-code conflict
+
+Then:
+
+- use established decisions from this document
+- inspect repository
+- inspect existing code
+- document the uncertainty
+- propose the safest implementation
+- ask for human approval when it affects money, security, legal compliance or core astrology calculations
+
+============================================================
+76. IMPORTANT PRODUCT PRINCIPLE
+============================================================
+
+Stella is NOT merely a horoscope content website.
+
+It is primarily:
+
+AN ASTROLOGY CONSULTATION MARKETPLACE.
+
+The free tools are acquisition and engagement mechanisms.
+
+The key conversion is:
+
+"Connect / Talk to an Astrologer."
+
+Every appropriate service should intelligently connect the customer with a suitable astrologer.
+
+============================================================
+77. IMPORTANT UX PRINCIPLE
+============================================================
+
+Never make the user feel that Stella is forcing a purchase.
+
+Free:
+
+Kundli
+Panchang
+Horoscope
+Basic astrology tools
+
+Premium:
+
+Advanced reports
+Personalized expert guidance
+Consultations
+Specialized services
+
+Human guidance:
+
+Connect to appropriate astrologer.
+
+============================================================
+78. IMPORTANT SECURITY PRINCIPLE
+============================================================
+
+The following are never trusted from the client:
+
+- Wallet balance
+- Payment success
+- Consultation duration
+- Commission amount
+- Payout amount
+- KYC approval
+- Astrology calculation
+- User permissions
+- Admin permissions
+
+Server is authoritative.
+
+============================================================
+79. IMPORTANT FINANCIAL PRINCIPLE
+============================================================
+
+Never edit financial history.
+
+Use:
+
+Events
++
+Ledger
++
+Compensating entries
++
+Reconciliation.
+
+Example:
+
+Original:
++₹500
+
+Correction:
+-₹100
+
+Net:
+₹400
+
+Never change the original event from ₹500 to ₹400.
+
+============================================================
+80. FINAL EXPECTATION
+============================================================
+
+Build Stella as a serious production platform.
+
+The result should look and feel like a premium Indian astrology technology company rather than a generic template.
+
+The final product should be:
+
+Beautiful
+Fast
+Secure
+Accessible
+Multilingual
+Mobile-first
+Production-ready
+Maintainable
+Testable
+Scalable to the initial 10,000-user target
+Designed for future international expansion
+
+============================================================
+81. FIRST ACTION
+============================================================
+
+DO NOT CODE YET.
+
+First:
+
+1. Audit repository.
+2. Produce architecture map.
+3. Produce current-vs-target gap analysis.
+4. Produce database/domain map.
+5. Produce route map.
+6. Produce API map.
+7. Produce application map.
+8. Produce third-party integration map.
+9. Produce security boundary map.
+10. Produce implementation phases.
+11. Identify contradictions between existing code and this specification.
+12. Identify any payment/legal decisions that must remain human-approved.
+13. Identify any astrology calculation decisions that require validation.
+14. Propose the first vertical slice.
+
+Then STOP and present the audit and implementation plan for review.
+
+Only after approval should implementation begin.
+
+============================================================
+END OF MASTER STELLA ASTROLOGY SPECIFICATION
+============================================================

@@ -1,0 +1,99 @@
+# ---------------------------------------------------------------------------
+# Stella Astrology — secrets & local config
+# NOTHING containing a live credential may ever be committed.
+# Real secrets live in /home/stellaastro/secrets/ (outside the web docroot).
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+config.txt
+secrets/
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+rzp-key.csv
+google-services.json
+GoogleService-Info.plist
+firebase-adminsdk*.json
+serviceAccount*.json
+*.mobileprovision
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+.yarn/
+vendor/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+ios/Pods/
+ios/.symlinks/
+android/.gradle/
+android/local.properties
+*.iml
+
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Tests / coverage
+# ---------------------------------------------------------------------------
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# ---------------------------------------------------------------------------
+# Local data & logs
+# ---------------------------------------------------------------------------
+*.log
+logs/
+*.sqlite
+*.sqlite3
+mysql-data/
+redis-data/
+rabbitmq-data/
+uploads/
+tmp/
+
+# ---------------------------------------------------------------------------
+# Editor / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.gstack/
+
+# ── Brand assets ────────────────────────────────────────────────
+# Only the files the site actually uses are tracked. Git keeps every version
+# of a binary forever, and two of the originals are documented as unusable in
+# production: stella_ltr_logo.png has a broken alpha channel, and
+# icon_images/chead-*.jpg carry five-star rating badges baked into the pixels
+# (§13, §71). The full 23 MB original set stays on disk, untracked, at
+# images/ — see docs/architecture/REPOSITORY_AUDIT.md.
+images/*
+!images/stella_hero_bg1.png
+!images/logo
+images/logo/*
+!images/logo/stella.png

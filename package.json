@@ -1,0 +1,32 @@
+{
+  "name": "stella-astrology",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Astrology consultation marketplace for India. Scheduled bookings, web-only V1.",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "tsc --noEmit -p tsconfig.base.json",
+    "gate:contrast": "node scripts/contrast-lint.mjs",
+    "gate:i18n": "node scripts/i18n-parity.mjs",
+    "gate:fixtures": "node scripts/no-fixtures-in-prod.mjs",
+    "gates": "npm run gate:contrast && npm run gate:i18n && npm run gate:fixtures"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

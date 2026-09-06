@@ -1,0 +1,77 @@
+/**
+ * Stella Astrology — design tokens
+ * Source of truth: DESIGN.md. Change both together.
+ *
+ * CONTRAST RATIOS ARE MEASURED, NOT ESTIMATED.
+ * --accent (gold) is 2.96:1 on ivory and FAILS WCAG AA for any text size.
+ * It is permitted ONLY as hairline rules, borders and ornament.
+ * scripts/contrast-lint.mjs fails the build if it is used as text or a fill.
+ */
+
+:root {
+  /* ── Colour ─────────────────────────────────────────────── */
+  --surface:    #F7F1E3;              /* ivory ground                    */
+  --surface-2:  #FBF7EE;              /* raised panel                    */
+  --ink:        #2B1B10;              /* 14.8:1 on ivory — AAA           */
+  --ink-soft:   #6B5643;              /*  5.1:1 on ivory — AA            */
+  --cta:        #904000;              /*  6.4:1 on ivory — AA — buttons  */
+  --cta-hover:  #7A3600;
+  --accent:     #C08000;              /*  2.96:1 — ORNAMENT ONLY         */
+  --sage:       #6E7A52;              /* logo leaves — botanical only    */
+  --coral:      #D9705C;              /* hero flowers — botanical only   */
+  --rule:       rgba(192, 128, 0, .38);
+  --visited:    #6E3200;              /* visited links MUST differ       */
+
+  /* Dark surfaces. Gold IS permitted as text here — the rule is about
+     gold on ivory, not gold in general. */
+  --dark-ground: #2B1B10;
+  --dark-panel:  #3A2718;
+  --dark-text:   #F7F1E3;
+  --dark-soft:   #D9CDBB;
+  --dark-border: #5A4736;
+
+  /* ── Type ───────────────────────────────────────────────── */
+  /* Two families. Inter/Roboto/system stacks are rejected: no Devanagari
+     coverage, and they read as a default rather than a decision. */
+  --font-dev: "Tiro Devanagari Hindi", Georgia, serif;
+  --font-lat: "Cormorant Garamond", Georgia, serif;
+
+  --step--1: 0.95rem;
+  --step-0:  1.0625rem;
+  --step-1:  1.3rem;
+  --step-2:  1.65rem;
+  --step-3:  2.15rem;
+  --step-4:  2.9rem;
+  --step-5:  3.9rem;
+
+  --leading-body: 1.7;
+  --leading-head: 1.28;
+
+  /* ── Space (8px base) ───────────────────────────────────── */
+  --s1: 0.5rem;
+  --s2: 1rem;
+  --s3: 1.5rem;
+  --s4: 2.5rem;
+  --s5: 4rem;
+  --s6: 6rem;
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  --maxw: 1180px;
+  --tap:  44px;                       /* minimum touch target           */
+  --radius: 2px;
+
+  /* ── Motion ─────────────────────────────────────────────── */
+  --ease: cubic-bezier(.2, .7, .3, 1);
+  --dur-fast: .18s;
+  --dur-slow: .8s;
+}
+
+@media (max-width: 860px) {
+  :root {
+    --step-5: 2.45rem;
+    --step-4: 1.95rem;
+    --step-3: 1.5rem;
+    --s6: 3.5rem;
+    --s5: 2.5rem;
+  }
+}
