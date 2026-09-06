@@ -27,6 +27,13 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+
+  // Prisma diffs migrations in a throwaway shadow database. The app user has
+  // no global CREATE privilege — correctly, it should not — so point Prisma at
+  // a dedicated database rather than widening that grant.
+  // Not needed in production: `migrate deploy` applies existing migrations and
+  // never diffs, so this is only read in development.
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 /// Waitlist signups from the public landing page (Phase 2).
