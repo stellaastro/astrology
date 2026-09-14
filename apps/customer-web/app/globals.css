@@ -1,11 +1,12 @@
-/* Stella Astrology — holding page.
+/* Stella Astrology — page chrome and sections.
  *
- * Built on the real tokens (packages/design-system/tokens.css) so this becomes
- * the landing page rather than being replaced. Rules from DESIGN.md that are
- * load-bearing here:
+ * The hero owns its own styles (app/_components/StellaHero.module.css). What
+ * lives here is everything around it: header, sections, footer and the Kundli
+ * page. Rules from DESIGN.md that are load-bearing:
  *   - gold is ornament only, never text or a fill
- *   - scroll-linked motion animates transform, never opacity
  *   - 44px minimum touch targets, visible focus, visited links distinct
+ *   - every rgba() is greyscale; brand colours come from tokens so a palette
+ *     change carries through (contrast-lint enforces both)
  */
 
 * { box-sizing: border-box; }
@@ -21,6 +22,7 @@ body {
   font-size: var(--step-0);
   line-height: var(--leading-body);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;            /* nothing may scroll the page sideways */
 }
 
 /* Display type: serif, and it must match the script it sets. A Devanagari
@@ -49,6 +51,8 @@ a:visited { color: var(--visited); }
 
 /* ── Header ──────────────────────────────────────────────────── */
 .top {
+  position: relative;
+  z-index: 3;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
 }
@@ -59,7 +63,16 @@ a:visited { color: var(--visited); }
   display: flex;
   align-items: center;
 }
-.brand { display: flex; align-items: center; gap: .65rem; }
+/* The header brand is a link to /, so it must opt out of the global link
+   colour and underline — a terracotta, underlined wordmark is not the mark. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.brand:visited { color: var(--ink); }
 .brand img { width: 44px; height: 44px; border-radius: 50%; }
 .brand b {
   font-family: var(--font-display-lat);
@@ -78,86 +91,11 @@ a:visited { color: var(--visited); }
   color: var(--ink-soft);
 }
 
-/* ── Hero ────────────────────────────────────────────────────── */
-.hero {
-  position: relative;
-  min-height: 74vh;
-  display: grid;
-  align-items: center;
-  background: url('/hero.webp') no-repeat right center / cover;
-}
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  /* Fallback first: literal rgb of --surface (#FFF8E8). Kept in sync by the
-     contrast lint, which fails if these triplets stop matching the token —
-     the previous pair was hand-inlined and silently held the OLD ivory. */
-  background: linear-gradient(
-    90deg,
-    var(--surface) 0,
-    var(--surface) 30%,
-    rgba(255, 248, 232, .86) 44%,
-    rgba(255, 248, 232, 0) 62%
-  );
-  /* Preferred: derives from the token, so it can never drift. Browsers without
-     color-mix() keep the declaration above. */
-  background: linear-gradient(
-    90deg,
-    var(--surface) 0,
-    var(--surface) 30%,
-    color-mix(in srgb, var(--surface) 86%, transparent) 44%,
-    color-mix(in srgb, var(--surface) 0%, transparent) 62%
-  );
-}
-.heroin {
-  position: relative;
-  max-width: var(--maxw);
-  margin-inline: auto;
-  padding: var(--s5) var(--s3);
-  width: 100%;
-}
-.herotext { max-width: 34rem; }
-
-.eyebrow {
-  font-size: .72rem;
-  letter-spacing: .24em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  margin: 0 0 var(--s2);
-}
-.eyebrow::after {
-  content: '';
-  display: block;
-  width: 56px;
-  height: 0;
-  border-top: 1px solid var(--accent);   /* a rule, not a fill */
-  margin-top: .6rem;
-}
-
-h1 { font-size: var(--step-5); margin-bottom: var(--s2); }
-.sub {
-  font-size: var(--step-1);
-  color: var(--ink-soft);
-  margin: 0 0 var(--s3);
-  max-width: 30rem;
-}
-
-.contact {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap);
-  gap: .5rem;
-  font-size: var(--step-0);
-}
-
 /* ── Sections ────────────────────────────────────────────────── */
 section { padding-block: var(--s6); }
 .sechead { max-width: 38rem; margin-bottom: var(--s4); }
 .sechead h2 { font-size: var(--step-4); margin-bottom: var(--s2); }
 .sechead p { color: var(--ink-soft); margin: 0; }
-
-#astrologers { border-top: 1px solid var(--rule); }
 
 /* Named people, no fabricated detail. Nothing here is a rating, a count or a
    testimonial (§13) and nothing is a placeholder dash. */
@@ -172,12 +110,58 @@ section { padding-block: var(--s6); }
 .person span {
   font-family: var(--font-display-lat);
   font-size: var(--step-2);
-  color: var(--ink-soft);   /* was --accent: 2.96:1, gold is never text */
+  color: var(--ink-soft);   /* gold would be 2.31:1 — never text */
   line-height: 1;
 }
 .person h3 { font-size: var(--step-2); margin-bottom: .15rem; }
 .person p {
   margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+/* ── Interior pages (e.g. /kundli) ───────────────────────────── */
+.page { padding-block: var(--s6) var(--s5); }
+.eyebrow {
+  margin: 0 0 var(--s2);
+  color: var(--leaf);
+  font-size: .72rem;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+.pageTitle { font-size: var(--step-4); max-width: 22ch; margin-bottom: var(--s3); }
+.pageLede {
+  max-width: 44ch;
+  margin: 0 0 var(--s3);
+  color: var(--ink-soft);
+  font-size: var(--step-1);
+}
+.pageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin: var(--s4) 0 0;
+}
+.btn, .btnGhost {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 1.35rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-size: var(--step-0);
+}
+.btn { color: var(--surface); background: var(--cta); border: 1px solid var(--cta); }
+.btn:visited { color: var(--surface); }
+.btn:hover { background: var(--cta-hover); }
+.btnGhost { color: var(--ink); border: 1px solid var(--rule); }
+.btnGhost:visited { color: var(--ink); }
+.btnGhost:hover { background: var(--cream); }
+.pageNote {
+  max-width: 48ch;
+  margin: var(--s5) 0 0;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
   color: var(--ink-soft);
   font-size: var(--step--1);
 }
@@ -197,34 +181,19 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
    the lint now checks it. */
 .legal { margin-top: var(--s3); line-height: 1.9; color: var(--dark-muted); }
 
-/* ── Motion: transform only, never opacity ───────────────────── */
-@media (prefers-reduced-motion: no-preference) {
-  .rise { animation: rise .7s var(--ease) both; }
-  .rise:nth-child(2) { animation-delay: .08s; }
-  .rise:nth-child(3) { animation-delay: .16s; }
-  .rise:nth-child(4) { animation-delay: .24s; }
-  @keyframes rise {
-    from { transform: translateY(14px); }
-    to   { transform: none; }
-  }
+@media (max-width: 860px) {
+  .person { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }
+  .pageTitle { font-size: var(--step-3); }
 }
 
-/* ── Mobile: the hero composition does not survive portrait ──── */
-@media (max-width: 860px) {
-  .hero { min-height: auto; background: none; display: block; }
-  .hero::before { display: none; }
-  /* hero-mobile.webp is composed for THIS band (780x506, wheel centred), so
-     it needs no object-position nudge. The old 72% offset existed to drag the
-     wheel into frame out of the desktop crop; keeping it now pushes the
-     centred wheel back off-centre. */
-  .heroart {
-    display: block;
-    width: 100%;
-    height: 30vh;
-    object-fit: cover;
-    object-position: center;
-  }
-  .heroin { padding: var(--s4) var(--s3); }
-  .person { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }
+/* Skip link — first in the DOM, visible only when focused (DESIGN.md §8). */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  padding: .7rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
 }
-@media (min-width: 861px) { .heroart { display: none; } }
+.skip:focus-visible { left: var(--s3); top: var(--s2); }

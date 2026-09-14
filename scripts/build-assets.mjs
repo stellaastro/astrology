@@ -18,139 +18,119 @@
  */
 
 import sharp from 'sharp';
-import { mkdirSync, existsSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const OUT = join(ROOT, 'apps/customer-web/public');
+const WHEEL_SRC = join(ROOT, 'images/logo/stella.png');
 mkdirSync(OUT, { recursive: true });
 
 const kb = (p) => (statSync(p).size / 1024).toFixed(0);
 
-/* ── The hero is COMPOSED, not resized ───────────────────────────
- *
- * It used to be a resize of stella_hero_bg1.png, which has a zodiac wheel with
- * WESTERN glyphs (♈♉♊) baked into it. The brand wheel labels every sign in
- * Devanagari (मेष · वृषभ · मिथुन), and ADR-035 makes Devanagari canonical — so
- * the old hero contradicted the brand on the same page that showed the logo.
- *
- * Composing from images/logo/stella.png instead means the hero can never drift
- * from the brand mark again: there is one wheel, and both come from it.
- *
- * Layout follows DESIGN.md §5: the wheel is the single visual anchor, held to
- * the right so the left ~45% stays a clean text zone. HERO_GROUND must equal
- * --surface or the hero shows a seam against the page; contrast-lint.mjs reads
- * this file directly and fails if they diverge.
- */
-/* Geometry is chosen so the wheel SURVIVES the crop, which is the whole
- * difficulty here. The hero is a `cover` background: at a 1440x666 desktop
- * viewport the 1536-wide canvas scales to ~843px tall and ~88px is cut from the
- * top and bottom. A circular sacred diagram cropped through its crown ornament
- * looks like a mistake, so the wheel's vertical margin must exceed that cut.
- *
- *   margin = (HERO_H - WHEEL) / 2 = 120px  ->  112px after scaling
- *   worst-case cut at 1440x666            ->   88px
- *
- * ~24px of headroom. Widen HERO_H or shrink WHEEL if the hero's min-height
- * changes; do not just make the wheel bigger because it looks good at one size.
- */
-const HERO_W = 1536;
-const HERO_H = 900;
-const HERO_GROUND = '#FFF8E8';   // must equal --surface
-const WHEEL = 660;               // anchor size; centre lands ~69% across
+/* SKY_TOP must equal --surface. The hero's painted sky sits directly against
+   the page ground, so a mismatch shows as a seam along the fold.
+   contrast-lint.mjs reads this file and fails if the two diverge. */
+const HERO_GROUND = '#FFF8E8';   // --surface
+const SKY_HORIZON = '#F4E1BA';   // --cream
 
-/* Mobile gets its OWN composition, not a crop of the desktop one.
- *
- * Below 860px the layout changes shape entirely (DESIGN.md §5): the hero
- * becomes a ~30vh top band with the text below it. Reusing the desktop image
- * there put the wheel hard against the right edge with a slab of empty ivory
- * beside it, because the wheel occupies only the right 43% of a 1536-wide
- * canvas and `object-position` cannot claw back more than the overflow.
- *
- * 780x506 matches a 390x253 band (30vh of an 844px viewport), so `cover`
- * crops almost nothing and the wheel sits centred.
- */
-const MOB_W = 780;
-const MOB_H = 506;
-const MOB_WHEEL = 420;
-
-async function compose({ w, h, size, left }) {
-  const wheel = await sharp(join(ROOT, 'images/logo/stella.png'))
-    .resize({ width: size })
-    .toBuffer();
-
-  return sharp({
-    create: { width: w, height: h, channels: 4, background: HERO_GROUND },
-  })
-    .composite([{
-      input: wheel,
-      left: left ?? Math.round((w - size) / 2),
-      top: Math.round((h - size) / 2),
-    }])
-    .png()
-    .toBuffer();
+if (!existsSync(WHEEL_SRC)) {
+  console.error(`build-assets: missing original ${WHEEL_SRC}`);
+  process.exit(1);
 }
 
-const composeHero = () =>
-  compose({ w: HERO_W, h: HERO_H, size: WHEEL, left: HERO_W - WHEEL - 110 });
-
-const composeHeroMobile = () =>
-  compose({ w: MOB_W, h: MOB_H, size: MOB_WHEEL });   // centred
-
-const JOBS = [
-  {
-    src: join(ROOT, 'images/logo/stella.png'),
-    // The mark renders at 44px. It was 1254px square — 28x larger than needed.
-    // Retina wants 2x, so 128 is generous and still tiny.
-    out: [{ file: 'mark.webp', width: 128, quality: 90 }],
-  },
-];
-
-let before = 0;
+let before = statSync(WHEEL_SRC).size;
 let after = 0;
 
-for (const job of JOBS) {
-  if (!existsSync(job.src)) {
-    console.error(`build-assets: missing original ${job.src}`);
-    process.exit(1);
-  }
-  before += statSync(job.src).size;
+const emit = (file, width, bytes) => {
+  after += bytes;
+  console.log(`  ${file.padEnd(18)} ${String(width).padStart(5)}px  ${(bytes / 1024).toFixed(0).padStart(5)} KB`);
+};
 
-  for (const { file, width, quality } of job.out) {
-    const dest = join(OUT, file);
-    await sharp(job.src)
-      .resize({ width, withoutEnlargement: true })
-      .webp({ quality, effort: 6 })
+/* ── Brand mark ──────────────────────────────────────────────────
+   Renders at 44px in the header. The original is 1254px square. */
+{
+  const dest = join(OUT, 'mark.webp');
+  await sharp(WHEEL_SRC).resize({ width: 128 }).webp({ quality: 90, effort: 6 }).toFile(dest);
+  emit('mark.webp', 128, statSync(dest).size);
+}
+
+/* ── Hero zodiac wheel ───────────────────────────────────────────
+ * The central object of the hero's celestial stage, and the one piece of that
+ * scene that is real artwork rather than an SVG stand-in. It renders up to
+ * ~620px and rotates continuously, so it needs genuine resolution — the 128px
+ * mark would visibly break up.
+ *
+ * Reusing images/logo/stella.png means the hero wheel and the brand mark are
+ * the same drawing and cannot drift apart. It is also why the scene labels
+ * signs in Devanagari (ADR-035) rather than Western glyphs.
+ */
+{
+  const dest = join(OUT, 'wheel.webp');
+  await sharp(WHEEL_SRC)
+    .resize({ width: 700, withoutEnlargement: true })
+    .webp({ quality: 86, effort: 6 })
+    .toFile(dest);
+  emit('wheel.webp', 700, statSync(dest).size);
+}
+
+/* ── Hero sky and landscape ──────────────────────────────────────
+ * Supplied artwork. Drop any image into images/herosection/ and it is picked
+ * up automatically on the next build — no code change, no path to edit.
+ *
+ * When none is present we still WRITE the file, as a palette-matched gradient.
+ * Referencing a missing background would 404 on every page load and leave the
+ * hero visibly unfinished; a stand-in degrades quietly and is replaced the
+ * moment real artwork arrives.
+ */
+{
+  const dir = join(ROOT, 'images/herosection');
+  const dest = join(OUT, 'hero-sky.webp');
+  const source = existsSync(dir)
+    ? readdirSync(dir).filter((f) => /\.(png|jpe?g|webp|avif)$/i.test(f)).sort()[0]
+    : undefined;
+
+  if (source) {
+    const src = join(dir, source);
+    before += statSync(src).size;
+    await sharp(src)
+      .resize({ width: 2000, withoutEnlargement: true })
+      .webp({ quality: 80, effort: 6 })
       .toFile(dest);
     after += statSync(dest).size;
-    console.log(`  ${file.padEnd(18)} ${String(width).padStart(5)}px  ${kb(dest).padStart(5)} KB`);
+    console.log(
+      `  ${'hero-sky.webp'.padEnd(18)} ${'2000'.padStart(5)}px  ${kb(dest).padStart(5)} KB  (from ${source})`,
+    );
+  } else {
+    const w = 1600;
+    const h = 900;
+    const svg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+         <defs>
+           <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+             <stop offset="0%" stop-color="${HERO_GROUND}"/>
+             <stop offset="58%" stop-color="#FFFDF8"/>
+             <stop offset="100%" stop-color="${SKY_HORIZON}"/>
+           </linearGradient>
+         </defs>
+         <rect width="${w}" height="${h}" fill="url(#sky)"/>
+       </svg>`,
+    );
+    await sharp(svg).webp({ quality: 82, effort: 6 }).toFile(dest);
+    after += statSync(dest).size;
+    console.log(
+      `  ${'hero-sky.webp'.padEnd(18)} ${String(w).padStart(5)}px  ${kb(dest).padStart(5)} KB  ` +
+      `(PLACEHOLDER — drop artwork into images/herosection/ to replace)`,
+    );
   }
 }
 
-/* Two heroes, two shapes — see composeHeroMobile. No point shipping 1536px to
-   a 390px screen, and no point shipping the desktop crop either. */
-before += statSync(join(ROOT, 'images/logo/stella.png')).size;
-
-for (const { file, width, quality, src } of [
-  { file: 'hero.webp', width: 1536, quality: 78, src: await composeHero() },
-  { file: 'hero-mobile.webp', width: 780, quality: 76, src: await composeHeroMobile() },
-]) {
-  const dest = join(OUT, file);
-  await sharp(src)
-    .resize({ width, withoutEnlargement: true })
-    .webp({ quality, effort: 6 })
-    .toFile(dest);
-  after += statSync(dest).size;
-  console.log(`  ${file.padEnd(18)} ${String(width).padStart(5)}px  ${kb(dest).padStart(5)} KB`);
+/* A PNG favicon for browsers that will not take WebP for an icon. */
+{
+  const dest = join(OUT, 'favicon.png');
+  await sharp(WHEEL_SRC).resize({ width: 64 }).png({ compressionLevel: 9 }).toFile(dest);
+  emit('favicon.png', 64, statSync(dest).size);
 }
-
-// A PNG favicon for browsers that will not take WebP for an icon.
-await sharp(join(ROOT, 'images/logo/stella.png'))
-  .resize({ width: 64 })
-  .png({ compressionLevel: 9 })
-  .toFile(join(OUT, 'favicon.png'));
-after += statSync(join(OUT, 'favicon.png')).size;
-console.log(`  ${'favicon.png'.padEnd(18)} ${'64'.padStart(5)}px  ${kb(join(OUT, 'favicon.png')).padStart(5)} KB`);
 
 const pct = (100 - (after / before) * 100).toFixed(1);
 console.log(
