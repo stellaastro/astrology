@@ -1,0 +1,43 @@
+[Unit]
+Description=Stella Astrology — review server (Next.js dev, hot reload)
+Documentation=file:///home/stellaastro/htdocs/www.stellaastro.com/README.md
+After=network.target
+
+# NOT a production service. This runs `next dev`, which compiles on demand,
+# ships unminified source and renders an error overlay on exceptions. It exists
+# so the owner can watch changes land live; www.stellaastro.com keeps serving
+# the optimised build from stella-web.service on :3000.
+
+[Service]
+Type=simple
+User=stellaastro
+Group=stellaastro
+WorkingDirectory=/home/stellaastro/htdocs/www.stellaastro.com/apps/customer-web
+Environment=NODE_ENV=development
+Environment=HOSTNAME=127.0.0.1
+# Separate build directory. Sharing `.next` with the production server would
+# mean every file change overwrote the build that the live site is serving.
+Environment=NEXT_DIST_DIR=.next-dev
+ExecStart=/usr/bin/npm run dev:review
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stella-dev
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# The dev server watches the whole repo and writes its own cache into it.
+ReadWritePaths=/home/stellaastro/htdocs/www.stellaastro.com
+# It has no business reading credentials, and unlike the production server it
+# renders stack traces to the browser — so make that impossible rather than
+# unlikely.
+InaccessiblePaths=/home/stellaastro/secrets
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

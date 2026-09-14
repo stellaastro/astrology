@@ -48,6 +48,7 @@ android/local.properties
 # Build output
 # ---------------------------------------------------------------------------
 .next/
+.next-dev/
 out/
 dist/
 .turbo/
