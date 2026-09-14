@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from 'next';
 // another (ADR-034). scripts/contrast-lint.mjs now fails if one reappears.
 import '@stella/design-system/tokens.css';
 import './globals.css';
+import { SiteFooter, SiteHeader } from './_components/SiteChrome';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.stellaastro.com'),
@@ -53,7 +54,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <a className="skip" href="#main">Skip to content</a>
+        <SiteHeader />
+        <main id="main">{children}</main>
+        <SiteFooter />
+      </body>
     </html>
   );
 }

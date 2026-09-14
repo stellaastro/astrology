@@ -1,0 +1,420 @@
+/**
+ * Stella hero — layout, copy and the celestial stage.
+ *
+ * Rules from DESIGN.md that are load-bearing here:
+ *   - gold (--accent) is ornament only; never text, never a fill. In SVG it is
+ *     a `fill`, which is ornament, not type.
+ *   - entrance motion lives INSIDE a no-preference media query, so reduced
+ *     motion shows finished content rather than an un-animated `from` state.
+ *   - every rgba() is greyscale (a shadow), because contrast-lint rejects
+ *     colour literals that match no token — inlined brand colours silently
+ *     survive a palette change.
+ */
+
+/* ── Shell ───────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: min(92vh, 860px);
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Static sky + landscape. Always present: build-assets.mjs writes a gradient
+   stand-in when no painted artwork is supplied, so this never 404s. */
+.sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: var(--surface);
+  background-image: url('/hero-sky.webp');
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: cover;
+}
+
+/* Keeps the left column readable over the painted sky without hiding it. */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    var(--surface) 0%,
+    color-mix(in srgb, var(--surface) 88%, transparent) 34%,
+    color-mix(in srgb, var(--surface) 30%, transparent) 52%,
+    color-mix(in srgb, var(--surface) 0%, transparent) 66%
+  );
+}
+
+.inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding: var(--s5) var(--s3);
+  display: grid;
+  grid-template-columns: 45fr 55fr;
+  align-items: center;
+  gap: var(--s4);
+}
+
+/* ── Copy ────────────────────────────────────────────────────── */
+
+.copy {
+  max-width: 34rem;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: 0 0 var(--s3);
+  color: var(--leaf);
+  font-size: .72rem;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+/* The lozenge is ornament, so gold is permitted — as a fill on a shape, not
+   as text. Kept out of the accessibility tree. */
+.spark {
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--step-5);
+  line-height: 1.08;
+  letter-spacing: -.01em;
+}
+
+.title em {
+  display: block;
+  margin-top: .12em;
+  color: var(--cta);
+  font-style: italic;
+}
+
+.lede {
+  max-width: 30rem;
+  margin: var(--s3) 0 var(--s4);
+  font-size: var(--step-1);
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  min-height: var(--tap);
+  padding: 0 1.35rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-size: var(--step-0);
+  transition: background-color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+
+.primary {
+  color: var(--surface);
+  background: var(--cta);
+  border: 1px solid var(--cta);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .12);
+}
+
+.primary:hover { background: var(--cta-hover); border-color: var(--cta-hover); }
+.primary:visited { color: var(--surface); }
+
+.secondary {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid var(--rule);
+}
+
+.secondary:hover { background: var(--cream); }
+.secondary:visited { color: var(--ink); }
+
+.arrow { flex: none; }
+
+.topics {
+  margin: var(--s4) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.topics b {
+  font-weight: 400;
+  color: var(--cta);          /* NOT gold — gold is 2.31:1 and fails as text */
+  padding-inline: .45rem;
+}
+
+/* ── Stage ───────────────────────────────────────────────────── */
+
+.stageWrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+/* One square coordinate space. Everything inside is positioned in %, so the
+   whole composition scales with a single value per breakpoint. */
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  aspect-ratio: 1;
+  pointer-events: none;
+  /* Pointer parallax writes these; they default to zero so the scene is
+     correct before (and without) JavaScript. */
+  --px: 0px;
+  --py: 0px;
+  transform: translate3d(var(--px), var(--py), 0);
+  transition: transform .45s cubic-bezier(.22, .61, .36, 1);
+}
+
+/* ── Artefacts: position wrapper > float wrapper > spin wrapper ──
+   Three nested layers so a float never overwrites a rotation. Each artefact
+   sets only its own layer's transform. */
+
+.place {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+
+.float { animation: float 11s ease-in-out infinite; }
+.spin  { animation: spin 180s linear infinite; }
+
+.place > *,
+.float > * { display: block; width: 100%; height: 100%; }
+
+/* Central zodiac wheel — real brand artwork, not an illustration. */
+.wheel {
+  inset: 18%;
+  z-index: 3;
+}
+
+.wheelImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, .16));
+}
+
+.halo {
+  position: absolute;
+  inset: 8%;
+  z-index: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 16%, transparent) 30%,
+    transparent 68%
+  );
+}
+
+.saturn    { inset: 2% 0 auto auto; width: 25%; height: 25%; z-index: 4; }
+.moon      { inset: 5% auto auto 2%; width: 15%; height: 15%; z-index: 4; }
+.marsPlace { inset: auto auto 24% 0;  width: 15%; height: 15%; z-index: 4; }
+.jade      { inset: auto 4% 26% auto; width: 11%; height: 11%; z-index: 4; }
+.crescent  { inset: 44% -1% auto auto; width: 10%; height: 10%; z-index: 4; }
+.armillary { inset: auto 4% 1% auto;  width: 22%; height: 22%; z-index: 4; }
+
+/* ── Orbits ──────────────────────────────────────────────────────
+   The bead follows the ELLIPSE YOU CAN SEE. The layer is squashed on Y, so a
+   plain rotation inside it traces the same ellipse the ring renders as; the
+   bead un-squashes itself so it stays round. Rotating the bead's wrapper —
+   never the stage — is what keeps the rest of the scene still. */
+
+.orbit {
+  position: absolute;
+  z-index: 2;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+}
+
+.orbitSpin {
+  position: absolute;
+  inset: 0;
+  animation: spin linear infinite;
+}
+
+.bead {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 28%, var(--cream), var(--accent) 62%, var(--ink));
+  box-shadow: 0 0 10px rgba(0, 0, 0, .12);
+}
+
+.orbitA { inset: 4%;  transform: rotate(-16deg) scaleY(.60); }
+.orbitA .orbitSpin { animation-duration: 44s; }
+.orbitA .bead { transform: translateX(-50%) scaleY(1.667); }
+
+.orbitB { inset: -4% 12%; transform: rotate(24deg) scaleY(.46); }
+.orbitB .orbitSpin { animation-duration: 67s; animation-direction: reverse; }
+.orbitB .bead { transform: translateX(-50%) scaleY(2.174); }
+
+.orbitC { inset: 16%; transform: rotate(-52deg) scaleY(.72); }
+.orbitC .orbitSpin { animation-duration: 36s; }
+.orbitC .bead { transform: translateX(-50%) scaleY(1.389); width: 7px; height: 7px; top: -3.5px; }
+
+/* ── Stars ───────────────────────────────────────────────────── */
+
+.star {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  animation: twinkle 7s ease-in-out infinite;
+}
+
+.star > svg { display: block; width: 100%; height: 100%; }
+
+/* Constellation lines sit behind everything and breathe more slowly than the
+   individual stars, so the two rhythms do not sync up and read as a pulse. */
+.constellation {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  animation: twinkle 16s ease-in-out infinite;
+}
+
+/* ── Motion control ──────────────────────────────────────────── */
+
+.motionToggle {
+  position: absolute;
+  z-index: 4;
+  right: var(--s3);
+  bottom: var(--s3);
+  min-height: 36px;
+  padding: .4rem .9rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: .78rem;
+  cursor: pointer;
+}
+
+.motionToggle:hover { background: var(--surface); }
+.motionToggle[disabled] { cursor: default; opacity: .75; }
+
+.hero :focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* ── Keyframes ───────────────────────────────────────────────── */
+
+@keyframes spin    { to { rotate: 360deg; } }
+@keyframes float   { 0%, 100% { translate: 0 0; } 50% { translate: 0 -12px; } }
+@keyframes twinkle { 0%, 100% { opacity: .28; } 50% { opacity: .8; } }
+@keyframes rise    { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+
+/* ── Motion gating ───────────────────────────────────────────────
+   Entrance animation is declared ONLY under no-preference. Under reduced
+   motion the copy is simply already in place — there is no `from` state left
+   holding opacity:0, which is the failure mode DESIGN.md §6 records. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .copy > * { animation: rise .7s var(--ease) both; }
+  .copy > :nth-child(2) { animation-delay: .07s; }
+  .copy > :nth-child(3) { animation-delay: .14s; }
+  .copy > :nth-child(4) { animation-delay: .21s; }
+  .copy > :nth-child(5) { animation-delay: .28s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero *,
+  .hero *::before,
+  .hero *::after { animation: none !important; transition: none !important; }
+  .stage { transform: none !important; }
+}
+
+/* The pause control. Parallax is stopped in JS; everything else here. */
+.hero[data-motion='paused'] *,
+.hero[data-motion='paused'] *::before,
+.hero[data-motion='paused'] *::after { animation-play-state: paused; }
+
+.hero[data-motion='paused'] .stage { transform: none; }
+
+/* ── Responsive ──────────────────────────────────────────────────
+   Below 900px the two-column split stops working: the copy needs the full
+   measure and the scene becomes a supporting image beneath it. */
+
+@media (max-width: 900px) {
+  /* Block, not flex. The motion control is a sibling of .inner, so while the
+     hero is a centred flex row the control becomes a second flex item and
+     lands beside the buttons instead of below the scene. */
+  .hero {
+    min-height: 0;
+    display: block;
+  }
+
+  .inner {
+    grid-template-columns: 1fr;
+    gap: var(--s3);
+    padding: var(--s4) var(--s3) var(--s5);
+  }
+
+  .copy { max-width: none; order: 1; }
+  .stageWrap { order: 2; }
+  .stage { max-width: 420px; }
+
+  .veil {
+    background: linear-gradient(
+      180deg,
+      var(--surface) 0%,
+      color-mix(in srgb, var(--surface) 82%, transparent) 46%,
+      color-mix(in srgb, var(--surface) 24%, transparent) 78%
+    );
+  }
+
+  .sky { background-position: center bottom; }
+
+  /* Fewer objects at small sizes — the wheel stays the main visual. */
+  .jade,
+  .crescent,
+  .orbitC { display: none; }
+
+  .motionToggle {
+    position: static;
+    display: block;
+    margin: 0 auto var(--s4);
+  }
+}
+
+@media (max-width: 520px) {
+  .stage { max-width: 290px; }
+  .lede { font-size: var(--step-0); }
+  .saturn { width: 22%; height: 22%; }
+  .armillary { display: none; }
+}

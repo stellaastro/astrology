@@ -224,32 +224,71 @@ label left and description right.
 
 ### Hero
 
-Full-bleed, one composition. The left ~45% is a text zone created by an ivory
-gradient; the **Devanagari zodiac wheel** on the right is the single visual
-anchor. Budget: one eyebrow, one headline, one supporting sentence, one CTA
-group, one image. No cards.
+Full-bleed, one composition. The left ~45% is a text zone; the right ~55% is an
+**animated celestial scene** whose single anchor is the Devanagari zodiac wheel.
+Budget: one eyebrow, one headline, one supporting sentence, one CTA group, one
+scene. No cards.
 
-**The hero is composed, not a stock background.** `scripts/build-assets.mjs`
-builds it from `images/logo/stella.png` onto a `--surface` ground, so the hero
-wheel and the brand mark are the same artwork and cannot drift apart. The
-previous hero was a pre-baked image carrying a **Western-glyph** wheel, which
-contradicted the logo on the same page.
+Implemented in `apps/customer-web/app/_components/` — `StellaHero.tsx` (layout,
+copy, motion control, parallax), `StellaHero.module.css` (all hero styling),
+`CelestialArt.tsx` (the artefacts).
 
-Two geometry constraints, both learned by rendering:
+### Three layers, and why
 
-- **The wheel must survive the crop.** The hero is a `cover` background; at
-  1440×666 roughly 88px is cut from the top and bottom. A circular sacred
-  diagram cropped through its crown ornament reads as a mistake, so the wheel's
-  vertical margin has to exceed the cut. Current headroom is ~24px.
-- **Mobile gets its own composition, not a crop of the desktop one.** Reusing
-  the desktop image below 860px pinned the wheel to the right edge with a slab
-  of empty ivory beside it — `object-position` cannot claw back more than the
-  overflow. `hero-mobile.webp` is built at 780×506 with the wheel centred, so
-  the band needs no positional nudge.
+1. **Sky** — `/hero-sky.webp`, static. Painted artwork dropped into
+   `images/herosection/` is picked up automatically by `build-assets.mjs`; with
+   none present it writes a palette-matched gradient so the page never 404s and
+   never looks unfinished.
+2. **Veil** — an ivory gradient so the copy stays readable over the painted sky
+   without hiding it.
+3. **Stage** — a square coordinate space holding every animated object. All
+   artefacts are positioned in `%`, so one `max-width` scales the composition.
 
-**Below 860px the composition collapses** — a left-text/right-art layout does not
-survive portrait. The art becomes a 30vh top band, `object-position: center`,
-with text below on solid ivory.
+### Artefact wrappers: position → float → spin
+
+Each object is nested three deep, because a single element cannot hold two
+transforms without one overwriting the other:
+
+```
+.place   absolute position and size, no animation
+  .float gentle drift        (translate)
+    .spin rotation           (rotate)
+```
+
+The zodiac wheel turns once in **180s**. Planets drift 12px over 9–14s with
+varied delays so nothing pulses in unison.
+
+### Orbits: the bead follows the ellipse you can see
+
+A rotating wrapper traces a **circle**, not an ellipse. The orbit layer is
+therefore squashed (`rotate(θ) scaleY(k)`), which turns both the ring's
+`border-radius: 50%` and the bead's circular path into the *same* ellipse; the
+bead then applies `scaleY(1/k)` to stay round.
+
+**Only the bead's wrapper rotates.** If the stage rotated, every object would
+swing together and the scene would read as one spinning graphic.
+
+### Motion rules
+
+- **Entrance animation is declared only inside
+  `@media (prefers-reduced-motion: no-preference)`.** Declaring it globally and
+  disabling it under `reduce` would leave `fill-mode: both` holding
+  `opacity: 0` — the DESIGN.md §6 failure, in a new place.
+- A **Pause animation** control sets `data-motion="paused"`, which pauses every
+  animation and zeroes the parallax. Parallax is additionally fine-pointer only.
+- Reduced motion is honoured by **CSS, not component state** — state arrives
+  after hydration and would let one animated frame through first.
+
+**Below 900px** the split stops working: the copy takes the full measure, the
+scene moves beneath it, and the jade planet, crescent and third orbit are
+dropped. The wheel stays. The hero also becomes `display: block` there, because
+the motion control is a sibling of the content and would otherwise become a
+second flex item beside the buttons.
+
+**Still to replace:** Saturn, the moon, both planets, the crescent and the
+armillary sphere are refined SVG stand-ins drawn from the palette, not
+commissioned artwork. Swap each `<svg>` for an `<img>` inside the same wrapper
+when real artwork exists — the animation layers do not change.
 
 ---
 
