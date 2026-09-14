@@ -213,12 +213,16 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
 @media (max-width: 860px) {
   .hero { min-height: auto; background: none; display: block; }
   .hero::before { display: none; }
+  /* hero-mobile.webp is composed for THIS band (780x506, wheel centred), so
+     it needs no object-position nudge. The old 72% offset existed to drag the
+     wheel into frame out of the desktop crop; keeping it now pushes the
+     centred wheel back off-centre. */
   .heroart {
     display: block;
     width: 100%;
     height: 30vh;
     object-fit: cover;
-    object-position: 72% center;
+    object-position: center;
   }
   .heroin { padding: var(--s4) var(--s3); }
   .person { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }

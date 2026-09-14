@@ -166,14 +166,29 @@ for (const file of walk(ROOT)) {
 /* Next requires a literal for themeColor, so that one duplicate is
    unavoidable — but it can still be checked rather than trusted. */
 const surfaceHex = (tokens['--surface'] ?? '').toUpperCase();
-for (const file of walk(ROOT)) {
-  const text = readFileSync(file, 'utf8');
-  const m = /themeColor:\s*'(#[0-9a-fA-F]{6})'/.exec(text);
-  if (m && m[1].toUpperCase() !== surfaceHex) {
-    failures.push(
-      `${file.replace(ROOT, '')} — themeColor is ${m[1]} but --surface is ` +
-      `${surfaceHex}. The browser chrome would not match the page.`,
-    );
+
+/* Each entry: a pattern capturing a hex, and what that literal is for. Both of
+   these are places a literal MUST equal --surface and nothing else was
+   checking them. build-assets.mjs is not in SCAN_EXT, so it is read directly. */
+const MUST_MATCH_SURFACE = [
+  { files: () => walk(ROOT), re: /themeColor:\s*'(#[0-9a-fA-F]{6})'/,
+    what: 'themeColor — the browser chrome would not match the page' },
+  { files: () => [join(ROOT, 'scripts/build-assets.mjs')],
+    re: /HERO_GROUND\s*=\s*'(#[0-9a-fA-F]{6})'/,
+    what: 'HERO_GROUND — the composed hero would have a visible seam against the page' },
+];
+
+for (const { files, re, what } of MUST_MATCH_SURFACE) {
+  for (const file of files()) {
+    let text;
+    try { text = readFileSync(file, 'utf8'); } catch { continue; }
+    const m = re.exec(text);
+    if (m && m[1].toUpperCase() !== surfaceHex) {
+      failures.push(
+        `${file.replace(ROOT, '')} — ${m[1]} should be --surface ` +
+        `(${surfaceHex}): ${what}.`,
+      );
+    }
   }
 }
 

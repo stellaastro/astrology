@@ -224,14 +224,32 @@ label left and description right.
 
 ### Hero
 
-Full-bleed, one composition. The left ~45% is a text zone created by a cream
-gradient over `stella_hero_bg1.png`; the gold zodiac wheel on the right is the
-single visual anchor. Budget: one eyebrow, one headline, one supporting sentence,
-one CTA group, one image. No cards.
+Full-bleed, one composition. The left ~45% is a text zone created by an ivory
+gradient; the **Devanagari zodiac wheel** on the right is the single visual
+anchor. Budget: one eyebrow, one headline, one supporting sentence, one CTA
+group, one image. No cards.
+
+**The hero is composed, not a stock background.** `scripts/build-assets.mjs`
+builds it from `images/logo/stella.png` onto a `--surface` ground, so the hero
+wheel and the brand mark are the same artwork and cannot drift apart. The
+previous hero was a pre-baked image carrying a **Western-glyph** wheel, which
+contradicted the logo on the same page.
+
+Two geometry constraints, both learned by rendering:
+
+- **The wheel must survive the crop.** The hero is a `cover` background; at
+  1440×666 roughly 88px is cut from the top and bottom. A circular sacred
+  diagram cropped through its crown ornament reads as a mistake, so the wheel's
+  vertical margin has to exceed the cut. Current headroom is ~24px.
+- **Mobile gets its own composition, not a crop of the desktop one.** Reusing
+  the desktop image below 860px pinned the wheel to the right edge with a slab
+  of empty ivory beside it — `object-position` cannot claw back more than the
+  overflow. `hero-mobile.webp` is built at 780×506 with the wheel centred, so
+  the band needs no positional nudge.
 
 **Below 860px the composition collapses** — a left-text/right-art layout does not
-survive portrait. The art becomes a 32vh top band cropped to `object-position:
-72% center`, with text below on solid cream.
+survive portrait. The art becomes a 30vh top band, `object-position: center`,
+with text below on solid ivory.
 
 ---
 
