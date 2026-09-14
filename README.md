@@ -70,6 +70,28 @@ npm run dev --workspace @stella/api            # :4000
 
 nginx proxies `/` to `:3000` and `/api/v1` to `:4000`.
 
+### Watching changes land — the review server
+
+A second Next.js instance runs `next dev` on the project host, so a saved file
+is visible in the browser within a second or two. No build, no deploy.
+
+**https://www.stellaastro.com:8434** — basic auth, credentials in
+`/home/stellaastro/secrets/config.txt` under `DEV_REVIEW_*`.
+
+Production is untouched; it keeps serving the optimised build on `:3000`.
+
+```bash
+sudo systemctl status  stella-dev
+sudo systemctl restart stella-dev      # after next.config.mjs or dependency changes
+sudo systemctl stop    stella-dev      # frees ~350 MB when you are not reviewing
+journalctl -u stella-dev -f            # compile errors land here first
+```
+
+**nodemon is deliberately not installed.** Next.js already has Fast Refresh,
+which swaps changed components into the running page without losing state;
+nodemon would replace that with slower full restarts. See
+`infrastructure/dev-review/README.md`.
+
 ---
 
 ## Checks
