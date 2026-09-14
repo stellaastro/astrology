@@ -10,7 +10,14 @@
 Neither source document has been edited; this log records which side was chosen
 and why, so no future reader has to guess.
 
-Precedence: `DECISION_LOG.md` → `system_architecture.md` → `rough_plan.txt`.
+Precedence: `DECISION_LOG.md` → **Edition 2.0** → `system_architecture.md` →
+`rough_plan.txt`.
+
+**Edition 2.0** (14 September 2026) arrived after most of this log was written,
+so it is the newest document and the easiest to mistake for the current plan. It
+is not. **ADR-033** records what it supersedes, what it contributes, and why its
+evidence chapter describes a codebase that is not in this repository. Read
+ADR-033 before acting on anything in it.
 
 ---
 
@@ -77,6 +84,19 @@ Verified against the `--surface #F7F1E3` ground:
 | `--accent` `#C08000` | 2.95 | **fails — ornament only, by design** |
 
 White on the bronze CTA is 7.19:1.
+
+> **SUPERSEDED IN PART — 2026-09-14, by ADR-034.** The token *values* above are
+> void; the *rules* survive. Gold is still never text and never a CTA fill, and
+> the blue direction is still void.
+>
+> Two corrections while superseding, because this block had drifted from the
+> code long before the palette changed: the names `--surface-raised`,
+> `--ink-muted`, `--ornament` and `--sacred` **never existed in `tokens.css`**
+> (the real names were `--surface-2`, `--ink-soft`, and there was no `--ornament`
+> or `--sacred` at all), and `--cta-hover` shipped as `#7A3600`, not `#702F00`.
+> A documented token set nobody could `grep` for is worse than none, which is why
+> `packages/design-system/tokens.css` is now the single source and this file
+> points at it rather than restating it.
 
 **Consequence.** Themes 1, 2, 3 and 5 in §13 (Midnight Cosmic, Royal Sapphire,
 Sky Mountain, Twilight Purple) are dropped. Theme 4 (Ivory & Gold) becomes the
@@ -982,3 +1002,221 @@ anything**, because ADR-023 removed the wallet from V1.
 | 15 | Can `stella_ltr_logo.png` be re-cut from a clean source, or does the typeset wordmark become permanent? | Phase 2 | Vasantharaj |
 | 16 | Success criteria — straw values proposed (40 paid consultations, ≥25 distinct customers, ≥25% rebooking in 60 days, plus share of bookings naming a specific astrologer) | launch review | Vasantharaj |
 | 17 | AI provider and budget — no AI credentials provisioned | post-revenue, content phase | Vasantharaj |
+
+---
+
+## ADR-033 — Edition 2.0 is a source document, not the plan
+
+**Date:** 2026-09-14 · **Status:** Accepted
+
+**Context.** A documentation package arrived dated 14 September 2026: *Stella
+Architecture & Delivery Blueprint, Edition 2.0* — eight Markdown files and a
+41-page PDF. It is careful work. It is also **newer than every ADR here**, which
+makes it dangerous: a future session reading by date will treat it as current.
+
+It plans a materially different product. And its `REPOSITORY_AUDIT.md` — the
+evidence chapter the whole package rests on — describes revision
+`c7873a961ecb2805fc44c5ec2cc537523c681bc9` with ten service pages and working
+`/api/numerology` and `/api/tarot` endpoints. **Verified absent:** that revision
+is not in this git history, there is no `stella-services` tree, and no such
+routes exist. It inventories Numerology and Tarot as "Implemented". Not here.
+
+**Decision.** Edition 2.0 sits **below `DECISION_LOG.md`** in precedence. Adopt
+three things and nothing else:
+
+- the colour palette → **ADR-034**
+- the typographic structure → **ADR-035**
+- the staged development-data approach → **ADR-036**
+
+Retain `STORAGE_PLAN.md`'s KYC lifecycle as the **Phase 9+ blueprint**, unchanged.
+It is genuinely good — quarantine, scan, promotion to an immutable key, verifying
+the copy before marking ready, `document_access_events`, rejecting stale reviewer
+decisions. It is simply not due at roster 3.
+
+**Superseded on:** wallet and ledger (ADR-023 stands) · per-minute metering
+(ADR-024) · six applications (ADR-022) · Agora, RabbitMQ and Docker · KYC before
+revenue · 10,000 accounts and ~1,000 concurrent sessions (ADR-008).
+
+**Why each, in one line.** A wallet is stored value, and Edition 2.0's own H07
+makes stored value a legal dependency — per-booking removes it from the critical
+path. Its H03/H04 leave prorating, start/stop, pause and chat-inactivity
+unresolved; slot billing dissolves all four by construction rather than deferring
+them. Its H14 admits the capacity figure is unvalidated and never resolves it.
+
+**Also noted:** Edition 2.0 contains no backup task (while naming RPO ≤1h as a
+target), never confronts MySQL's lack of partial unique indexes, never mentions
+reschedule, never notices that at roster 3 the no-show adjudicator *is* the
+astrologer, never names DPDP, shows no awareness of TRAI DLT lead time, and
+publishes eight hex values with zero contrast ratios.
+
+Full comparison: `docs/architecture/EDITION_2_RECONCILIATION.md`.
+
+**Consequence.** `CLAUDE.md` carries the summary table, because it loads into
+every session and this is the decision most likely to be silently reversed.
+
+---
+
+## ADR-034 — Brand palette: the Edition 2.0 colours
+
+**Date:** 2026-09-14 · **Status:** Accepted · **Supersedes:** ADR-001's token
+values (its *rules* stand)
+
+**Context.** The owner asked for Edition 2.0's colour direction. Its six colours
+were then **verified against `images/logo/stella.png`** — the zodiac wheel
+contains every one: ivory panels, lotus cream, saffron gold ornament, a
+terracotta centre field, leaf green foliage, deep umber Devanagari. The new
+palette is *more* logo-faithful than the one it replaces, which read the same
+artwork and arrived at a colder ink and a bronze CTA. That, not preference, is
+the reason recorded here.
+
+**Decision.** Adopt all six verbatim. Ratios measured, not quoted:
+
+| Token | Value | On ivory | Note |
+|---|---|---|---|
+| `--surface` | `#FFF8E8` | — | warm ivory ground |
+| `--cream` | `#F4E1BA` | — | lotus cream, a real content surface |
+| `--ink` | `#48251C` | **12.75:1** AAA | deep umber |
+| `--cta` | `#A94424` | **5.61:1** AA | terracotta |
+| `--leaf` | `#4E682A` | **5.95:1** AA | leaf green, status |
+| `--accent` | `#D99A16` | **2.31:1 FAILS** | saffron gold — ornament only |
+
+**Edition 2.0 supplies six colours; the build needs sixteen.** It has no
+secondary-text, visited-link, hover or dark-surface values, and the contrast lint
+requires all of them. Five were derived inside the umber/terracotta hue family
+and measured: `--ink-soft #6E4A38` (7.35:1), `--cta-hover #8E3A1E` (7.15:1),
+`--visited #72301C` (9.21:1), `--dark-soft #E3D5C0` (9.34:1), `--dark-muted
+#C4AE97` (6.33:1).
+
+**Two consequences worth stating plainly.**
+
+1. **The gold rule tightened.** `#D99A16` is 2.31:1, against the old gold's
+   2.96:1. Adopting a brand palette made the accessibility constraint *stricter*.
+   A supplied mockup already sets small-caps gold display text on ivory — that is
+   not buildable, and the lint blocks it.
+2. **`--cta` on `--cream` is 4.61:1** — AA by 0.11. Lotus cream is a content
+   surface, so this pair is now checked by the lint rather than left to memory.
+
+**Fixed while swapping** (all pre-existing, none caused by the palette):
+
+- `apps/customer-web/app/tokens.css` was a **byte-identical duplicate** of the
+  package copy. The lint read one; the browser rendered the other. A palette
+  change applied to one file would have passed CI and never shipped. There is now
+  exactly one `tokens.css`, `packages/design-system` is a real workspace package,
+  and the lint fails if a second appears.
+- `.legal` used a hardcoded `#9C8770` — measured **3.93:1** on the dark ground,
+  i.e. failing AA silently since it was written.
+- The hero gradient hand-inlined `rgba(247, 241, 227, …)`, the old ivory. It
+  would not have followed the swap. Now `color-mix()` from the token, and the
+  lint rejects any rgba that matches no token.
+- `themeColor` in `layout.tsx` duplicated `--surface`; the lint now checks they
+  agree.
+
+---
+
+## ADR-035 — Typography: serif display, sans body
+
+**Date:** 2026-09-14 · **Status:** Accepted · **Amends:** ADR-025
+
+**Context.** Edition 2.0 asks for "an elegant serif for display headings and a
+readable sans serif for body text" — and **names no fonts at all**. So the
+structure is borrowed; the families are chosen here.
+
+ADR-025 set two serifs (Cormorant Garamond + Tiro Devanagari Hindi) and rejected
+Inter. A sans body reverses the first half. It does not reverse the second.
+
+**Decision.**
+
+```
+--font-display-lat  Cormorant Garamond      Latin headings
+--font-display-dev  Tiro Devanagari Hindi   Devanagari headings
+--font-body         Mukta                   all body and UI, both scripts
+```
+
+**Mukta** (Ek Type) is a Devanagari-and-Latin superfamily. One family covers both
+scripts, so the blanket `:lang(en)` font switch disappears from body copy —
+only headings switch by script.
+
+**Inter remains rejected, for its actual defect.** It has no Devanagari coverage,
+which is disqualifying on a Hindi-first product. Adopting a sans body removed the
+argument for two serifs; it did not resurrect Inter. Keeping the *reason* matters
+more than keeping the conclusion — a rule whose justification is lost gets
+reversed by the next person who finds it arbitrary.
+
+**Open, deliberately.** `--step-0` is `1.0625rem` because Cormorant is light at
+body size. Mukta is sturdier and may read correctly at `1rem`. That is a visual
+judgement and will be made by looking at the rendered page.
+
+**Also resolved.** The supplied zodiac wheel labels every sign in Devanagari
+(मेष · वृषभ · मिथुन …) and none in Western glyphs, so **Devanagari sign names are
+canonical**; `♈♉♊` are a secondary gloss at most. This closes the open question
+in `DESIGN.md` §10.
+
+---
+
+## ADR-036 — Staged development data: fake records, real everything else
+
+**Date:** 2026-09-14 · **Status:** Accepted · **Extends:** ADR-026
+
+**Context.** O3 — the three directors' photographs, credentials, experience,
+specialisations and per-session price — has gated Phase 4 onward since the plan
+was approved, and has not arrived. Meanwhile ADR-026 established fixture
+containment but said nothing about how much synthetic data to build against.
+
+**Decision — owner's direction, 2026-09-14.** Set the real data aside. Build the
+entire product against a **fully synthetic roster**: dummy astrologers, customers,
+bookings, consultations, payments and KYC documents.
+
+**The distinction that carries this:**
+
+> **Fake data, real everything else.** The records are synthetic. The database,
+> the authorization, the constraints, the state machine, the arithmetic and the
+> API contract are genuine. A screen powered by a fixture is never evidence that
+> the integration works.
+
+**Three modes.** Interface demo (fixtures + mock adapters, for building screens)
+→ **integrated development** (synthetic rows in real MySQL, synthetic documents
+in a private R2 dev bucket, provider sandboxes — *this is the default*) →
+staging rehearsal (release configuration, controlled provider sessions).
+
+**What this unblocks.** O3 no longer gates engineering. Phases 4–8 proceed at
+full speed; the three directors are entered through the same admin screens at
+launch, as data rather than code. O3 now gates only the public page, and
+therefore Razorpay. It is also better for privacy: the directors' real names and
+mobile numbers never enter a development database or a seed file.
+
+**Scope.** ~20 dummy astrologers. Three is too few to surface availability
+collisions, scheduling conflicts, admin queue behaviour or the no-show path —
+those bugs only appear at volume. Negative cases are seeded as first-class
+fixtures: no astrologer available, payment failed, duplicate webhook, astrologer
+cancellation, dropped call.
+
+**The one boundary.** Dev and staging are 100% synthetic. **`www.stellaastro.com`
+in production is real or empty** — never invented practitioners. A fake
+astrologer on a registered company's live paid-consultation site means a customer
+can attempt to book a person who does not exist; §13 and §71 both forbid it, and
+`images/icon_images/chead-*.jpg` ship with **baked-in five-star rating badges**,
+the failure arriving pre-made. Enforced by the existing `is_dev_fixture` boot
+guard.
+
+**Controls this adds.**
+
+1. Every synthetic row carries a **dataset ID**, so cleanup can never reach a
+   real record.
+2. **Production must fail to boot** when a mock payment, identity or consultation
+   adapter is selected — same posture as the fixture guard: downtime over
+   contaminated data.
+3. Synthetic KYC files read **`SAMPLE / NOT VALID`**, hold no real personal data,
+   and live in a **separate private R2 dev bucket** under its own scoped token —
+   not `stella-backups`.
+4. **Sandbox webhooks get the same signature verification, deduplication and
+   replay protection as live ones.** A sandbox webhook trusted because it is
+   "only a test" is how the live one gets trusted too.
+5. **Recipient safety.** Never send an OTP, SMS or email to an invented number —
+   invented numbers belong to real people.
+6. Billing and tax arithmetic is tested against **hand-computed expected
+   results**, never against whatever the code currently returns.
+7. Simulated calls and chat are acceptable for building screens and **forbidden
+   as evidence**. Phase 8 does not pass until it has run against real 100ms on a
+   real handset.
+
+Detail: `docs/architecture/DEVELOPMENT_DATA_PLAN.md`.

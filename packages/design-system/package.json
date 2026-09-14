@@ -1,0 +1,12 @@
+{
+  "name": "@stella/design-system",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Design tokens — the single source of truth for colour, type, space and motion. Documented in DESIGN.md; enforced by scripts/contrast-lint.mjs.",
+  "exports": {
+    "./tokens.css": "./tokens.css"
+  },
+  "files": [
+    "tokens.css"
+  ]
+}

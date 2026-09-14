@@ -61,10 +61,18 @@ const PAIRS = [
   ['--ink',      '--surface',     7.0, 'body and heading text, AAA'],
   ['--ink-soft', '--surface',     4.5, 'secondary text, AA'],
   ['--cta',      '--surface',     4.5, 'buttons and links, AA'],
-  ['--surface',  '--cta',         4.5, 'ivory text on bronze fill, AA'],
+  ['--surface',  '--cta',         4.5, 'ivory text on terracotta fill, AA'],
   ['--visited',  '--surface',     4.5, 'visited links, AA'],
   ['--dark-text','--dark-ground', 7.0, 'text on dark surfaces, AAA'],
   ['--dark-soft','--dark-ground', 4.5, 'secondary text on dark, AA'],
+
+  /* Added with the Edition 2.0 palette (ADR-034). Lotus cream is a real
+     content surface, so text on it must be checked like any other ground —
+     --cta on --cream is 4.61:1, clearing AA by 0.11. That margin is too thin
+     to leave to anyone's judgement, which is the entire reason it is here. */
+  ['--cta',       '--cream',      4.5, 'terracotta on lotus cream — 0.11 margin'],
+  ['--ink',       '--cream',      7.0, 'body text on lotus cream, AAA'],
+  ['--dark-muted','--dark-ground',4.5, 'legal and footnote text on dark, AA'],
 ];
 
 const failures = [];
@@ -128,11 +136,87 @@ for (const file of walk(ROOT)) {
     let m;
     while ((m = re.exec(text)) !== null) {
       const line = text.slice(0, m.index).split('\n').length;
+      const goldRatio = accent && surface ? contrast(accent, surface).toFixed(2) : '?';
       failures.push(
-        `${file.replace(ROOT, '')}:${line} — ${what}. Gold is 2.96:1 on ivory ` +
-        `and fails WCAG. Use --cta for fills, --ink for text, --rule for lines.`,
+        `${file.replace(ROOT, '')}:${line} — ${what}. Gold is ${goldRatio}:1 ` +
+        `on ivory and fails WCAG at every text size. Use --cta for fills, ` +
+        `--ink for text, --rule for lines.`,
       );
     }
+  }
+}
+
+/* ── 3. There must be exactly ONE tokens.css ─────────────────── */
+/* A byte-identical copy lived in apps/customer-web/app/ until 2026-09-14. This
+   lint read the package copy; the browser rendered the app copy. A palette
+   change applied to one file passed CI and never reached the site. The bug is
+   invisible precisely because both files look correct in isolation. */
+for (const file of walk(ROOT)) {
+  if (file === TOKENS) continue;
+  if (!file.endsWith('tokens.css')) continue;
+  failures.push(
+    `${file.replace(ROOT, '')} — a second tokens.css. There must be exactly ` +
+    `one, at packages/design-system/tokens.css, imported as ` +
+    `'@stella/design-system/tokens.css'. Two copies mean this lint and the ` +
+    `browser read different files.`,
+  );
+}
+
+/* ── 4. Literal colours must agree with the tokens ───────────── */
+/* Next requires a literal for themeColor, so that one duplicate is
+   unavoidable — but it can still be checked rather than trusted. */
+const surfaceHex = (tokens['--surface'] ?? '').toUpperCase();
+
+/* Each entry: a pattern capturing a hex, and what that literal is for. Both of
+   these are places a literal MUST equal --surface and nothing else was
+   checking them. build-assets.mjs is not in SCAN_EXT, so it is read directly. */
+const MUST_MATCH_SURFACE = [
+  { files: () => walk(ROOT), re: /themeColor:\s*'(#[0-9a-fA-F]{6})'/,
+    what: 'themeColor — the browser chrome would not match the page' },
+  { files: () => [join(ROOT, 'scripts/build-assets.mjs')],
+    re: /HERO_GROUND\s*=\s*'(#[0-9a-fA-F]{6})'/,
+    what: 'HERO_GROUND — the composed hero would have a visible seam against the page' },
+];
+
+for (const { files, re, what } of MUST_MATCH_SURFACE) {
+  for (const file of files()) {
+    let text;
+    try { text = readFileSync(file, 'utf8'); } catch { continue; }
+    const m = re.exec(text);
+    if (m && m[1].toUpperCase() !== surfaceHex) {
+      failures.push(
+        `${file.replace(ROOT, '')} — ${m[1]} should be --surface ` +
+        `(${surfaceHex}): ${what}.`,
+      );
+    }
+  }
+}
+
+/* Hand-inlined rgba() triplets silently held the OLD ivory through a palette
+   change once already. Any rgba in app CSS must match a token, or be
+   greyscale (shadows and scrims, which are not brand colours). */
+const tokenRgb = new Set(
+  Object.values(tokens)
+    .map((v) => hex(v))
+    .filter(Boolean)
+    .map(({ r, g, b }) => `${r},${g},${b}`),
+);
+for (const file of walk(ROOT)) {
+  if (file === TOKENS) continue;
+  if (!['.css', '.scss'].includes(extname(file))) continue;
+  const text = readFileSync(file, 'utf8');
+  const re = /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*[,)]/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const [r, g, b] = [m[1], m[2], m[3]];
+    if (r === g && g === b) continue;               // greyscale: shadow/scrim
+    if (tokenRgb.has(`${r},${g},${b}`)) continue;   // matches a token
+    const line = text.slice(0, m.index).split('\n').length;
+    failures.push(
+      `${file.replace(ROOT, '')}:${line} — rgba(${r}, ${g}, ${b}) matches no ` +
+      `token. Inlined colours do not follow a palette change. Use ` +
+      `color-mix(in srgb, var(--token) N%, transparent), or add a token.`,
+    );
   }
 }
 

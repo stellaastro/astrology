@@ -1,40 +1,64 @@
 /**
  * Stella Astrology — design tokens
- * Source of truth: DESIGN.md. Change both together.
  *
- * CONTRAST RATIOS ARE MEASURED, NOT ESTIMATED.
- * --accent (gold) is 2.96:1 on ivory and FAILS WCAG AA for any text size.
- * It is permitted ONLY as hairline rules, borders and ornament.
- * scripts/contrast-lint.mjs fails the build if it is used as text or a fill.
+ * SINGLE SOURCE OF TRUTH. There must be exactly one tokens.css in this repo.
+ * A second copy inside apps/ existed until 2026-09-14: the lint read this file
+ * while the browser rendered that one, so a palette change could pass CI and
+ * never reach the site. scripts/contrast-lint.mjs now fails if a duplicate
+ * reappears. Import it as `@stella/design-system/tokens.css`.
+ *
+ * Prose source of truth: DESIGN.md. Change both together.
+ *
+ * Palette adopted from the Edition 2.0 brand system (ADR-034) and verified
+ * against images/logo/stella.png, which contains every one of these colours.
+ *
+ * CONTRAST RATIOS BELOW ARE MEASURED, NOT ESTIMATED.
+ * --accent (saffron gold) is 2.31:1 on ivory and FAILS WCAG AA at every text
+ * size — it is MORE restricted than the previous gold, not less. Permitted
+ * only as hairline rules, borders and ornament. The lint fails the build if it
+ * is used as text or a fill.
  */
 
 :root {
-  /* ── Colour ─────────────────────────────────────────────── */
-  --surface:    #F7F1E3;              /* ivory ground                    */
-  --surface-2:  #FBF7EE;              /* raised panel                    */
-  --ink:        #2B1B10;              /* 14.8:1 on ivory — AAA           */
-  --ink-soft:   #6B5643;              /*  5.1:1 on ivory — AA            */
-  --cta:        #904000;              /*  6.4:1 on ivory — AA — buttons  */
-  --cta-hover:  #7A3600;
-  --accent:     #C08000;              /*  2.96:1 — ORNAMENT ONLY         */
-  --sage:       #6E7A52;              /* logo leaves — botanical only    */
-  --coral:      #D9705C;              /* hero flowers — botanical only   */
-  --rule:       rgba(192, 128, 0, .38);
-  --visited:    #6E3200;              /* visited links MUST differ       */
+  /* ── Surfaces ───────────────────────────────────────────── */
+  --surface:     #FFF8E8;             /* warm ivory — brand ground       */
+  --surface-2:   #FFFDF8;             /* card surface                    */
+  --cream:       #F4E1BA;             /* lotus cream — highlighted bands */
 
-  /* Dark surfaces. Gold IS permitted as text here — the rule is about
-     gold on ivory, not gold in general. */
-  --dark-ground: #2B1B10;
-  --dark-panel:  #3A2718;
-  --dark-text:   #F7F1E3;
-  --dark-soft:   #D9CDBB;
-  --dark-border: #5A4736;
+  /* ── Text and action ────────────────────────────────────── */
+  --ink:         #48251C;             /* deep umber  12.75:1 — AAA       */
+  --ink-soft:    #6E4A38;             /* derived      7.35:1 — AA        */
+  --cta:         #A94424;             /* terracotta   5.61:1 — AA        */
+  --cta-hover:   #8E3A1E;             /* derived      7.15:1             */
+  --visited:     #72301C;             /* derived      9.21:1 — must differ from --cta */
+
+  /* ── Accent and status ──────────────────────────────────── */
+  --accent:      #D99A16;             /* saffron gold 2.31:1 — ORNAMENT ONLY */
+  --leaf:        #4E682A;             /* leaf green   5.95:1 — status/secondary */
+
+  /* Hairline rule, derived from --accent. rgba() so the lint's hex parser
+     never sees it — that is fine, it is a border colour and never text. */
+  --rule:        rgba(217, 154, 22, .38);
+
+  /* ── Dark surfaces ──────────────────────────────────────── */
+  /* Gold IS permitted as text here (5.51:1 on umber). The rule is about gold
+     on ivory, not gold in general. */
+  --dark-ground: #48251C;
+  --dark-panel:  #5C3225;
+  --dark-text:   #FFF8E8;             /* 12.75:1 — AAA                   */
+  --dark-soft:   #E3D5C0;             /*  9.34:1 — AA                    */
+  --dark-muted:  #C4AE97;             /*  6.33:1 — AA — legal/footnotes  */
+  --dark-border: #75503F;
 
   /* ── Type ───────────────────────────────────────────────── */
-  /* Two families. Inter/Roboto/system stacks are rejected: no Devanagari
-     coverage, and they read as a default rather than a decision. */
-  --font-dev: "Tiro Devanagari Hindi", Georgia, serif;
-  --font-lat: "Cormorant Garamond", Georgia, serif;
+  /* Serif display + sans body, per ADR-035. Mukta is an Ek Type superfamily
+     covering Devanagari AND Latin, so body copy needs no :lang() switch —
+     only headings switch by script.
+     Inter/Roboto/system stacks remain rejected: no Devanagari coverage, which
+     is disqualifying on a Hindi-first product. */
+  --font-display-lat: "Cormorant Garamond", Georgia, serif;
+  --font-display-dev: "Tiro Devanagari Hindi", Georgia, serif;
+  --font-body:        "Mukta", system-ui, sans-serif;
 
   --step--1: 0.95rem;
   --step-0:  1.0625rem;
@@ -57,7 +81,7 @@
 
   /* ── Layout ─────────────────────────────────────────────── */
   --maxw: 1180px;
-  --tap:  44px;                       /* minimum touch target           */
+  --tap:  44px;                       /* minimum touch target            */
   --radius: 2px;
 
   /* ── Motion ─────────────────────────────────────────────── */

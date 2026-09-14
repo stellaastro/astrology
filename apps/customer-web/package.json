@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@stella/design-system": "*",
     "next": "^15.1.0",
     "next-intl": "^3.26.0",
     "react": "^19.0.0",

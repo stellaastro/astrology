@@ -11,14 +11,39 @@ exist.
 
 ## Source-of-truth precedence
 
-Two planning documents disagree in sixteen places. Precedence is:
+Three planning documents disagree. Precedence is:
 
 1. `docs/architecture/DECISION_LOG.md` — **read this first, it resolves the conflicts**
-2. `system_architecture.md` — Volume I, newer
-3. `rough_plan.txt` — master spec, oldest
+2. **Edition 2.0** (`Stella_Website_Apps_and_Services_Plan.pdf` + its eight
+   Markdown files) — newest by date, and **mostly superseded**. See below.
+3. `system_architecture.md` — Volume I
+4. `rough_plan.txt` — master spec, oldest
 
-Never resolve a contradiction between the two source docs on your own. Check
-the decision log; if it is not covered there, ask.
+Never resolve a contradiction between source docs on your own. Check the
+decision log; if it is not covered there, ask.
+
+### Edition 2.0 — read this before acting on it (ADR-033)
+
+Dated 14 September 2026, so it *looks* current. **It plans a different, larger
+product**, and its repository-audit chapter describes a codebase that is not in
+this git history. Being newest does not make it authoritative.
+
+| Edition 2.0 says | Reality here |
+|---|---|
+| Wallet + double-entry ledger | **No wallet, no ledger.** Razorpay per-booking (ADR-023) |
+| Per-minute metering | **Slot-based billing** (ADR-024) |
+| Six apps (3 web + 3 Expo) | **One web app**, role-guarded routes (ADR-022) |
+| Agora · RabbitMQ · Docker · Redis | **100ms**; MySQL outbox; no RabbitMQ, no Docker |
+| KYC pipeline before revenue | **Manual admin creation** at roster ≤12 |
+| 10,000 accounts, ~1,000 concurrent | **~12–15 concurrent** (ADR-008) |
+
+**Three things are adopted from it, and only three:** the colour palette
+(ADR-034), the typography structure (ADR-035) and the staged development-data
+approach (ADR-036). Its `STORAGE_PLAN.md` KYC lifecycle is kept as the **Phase 9+
+blueprint** — good work, not yet due.
+
+If you find yourself building a wallet, a metering timer or a second app because
+Edition 2.0 asked for it: stop. Three plan reviews removed those deliberately.
 
 ## Settled decisions — do not re-litigate
 
@@ -28,10 +53,11 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 | Area | Decision |
 |---|---|
-| Palette | Ivory & Gold from the logo. **No navy, no sapphire** — the spec's blue direction is void (ADR-001) |
-| Gold | Accent, rules and ornament **only**. Never text, never a CTA fill — measured 2.96:1 on ivory. A CI contrast lint enforces this |
-| CTA | Bronze `#904000` on ivory `#F7F1E3` (6.4:1) |
-| Type | **Tiro Devanagari Hindi + Cormorant Garamond.** Two families. Inter is rejected — no Devanagari coverage (ADR-025) |
+| Palette | **Edition 2.0 brand system** (ADR-034): warm ivory `#FFF8E8` · lotus cream `#F4E1BA` · saffron gold `#D99A16` · terracotta `#A94424` · leaf green `#4E682A` · deep umber `#48251C`. Confirmed present in the logo. **No navy, no sapphire** (ADR-001) |
+| Gold | Accent, rules and ornament **only**. Never text, never a CTA fill — measured **2.31:1** on ivory, so this binds *harder* than before. A CI contrast lint enforces it |
+| CTA | Terracotta `#A94424` on ivory `#FFF8E8` (5.61:1). On lotus cream it is **4.61:1** — AA by 0.11, and the lint guards that pair |
+| Type | **Serif display, sans body** (ADR-035): Cormorant Garamond (Latin headings) · Tiro Devanagari Hindi (Devanagari headings) · **Mukta** (all body and UI, covers both scripts). Inter still rejected — no Devanagari coverage |
+| Dev data | **Fully synthetic roster** in dev and staging — astrologers, customers, bookings, KYC (ADR-036). Production public pages are **real or empty**, never invented practitioners |
 | Backend | NestJS + TypeScript. Not FastAPI, not Pydantic |
 | Web | Next.js (customer + admin). Admin is a role-guarded route group, not a separate app |
 | Mobile | **Web-only for V1.** Flutter is deferred, not cancelled (ADR-022 supersedes ADR-007) |
@@ -55,6 +81,8 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 - **MySQL has no partial unique indexes.** Slot uniqueness uses a generated column that is NULL when the row is not slot-occupying (ADR-029).
 - AI never computes planetary positions. It interprets structured output only (§15, §32).
 - No mock astrologers, mock balances, fake payment success or fake calculations outside explicit dev adapters (§71).
+- **Fake data, real everything else** (ADR-036). Dev and staging run on a fully synthetic roster — that is intended. What must stay real in every environment: the database, authorization, constraints, the state machine, the arithmetic and the API contract. **A screen driven by a fixture is never evidence that the integration works.** Sandbox webhooks get the same signature verification as live ones. Provider failure surfaces as an error or a pending state — never as a fake success.
+- **Never send an OTP, SMS or email to an invented number or address.** Invented numbers belong to real people. Use owned test accounts, provider test destinations or a local sink. The directors' real mobile numbers must never become test recipients.
 - No invented user counts, ratings or testimonials on the landing page (§13).
 - Migrations for every schema change. Never alter schema silently.
 - Feature work goes on `feature/*` branches, never straight to `main` (§57).
