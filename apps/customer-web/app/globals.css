@@ -10,23 +10,31 @@
 
 * { box-sizing: border-box; }
 
+/* Body is Mukta for BOTH scripts — it is a Devanagari+Latin superfamily, so
+   there is no :lang() switch here any more (ADR-035). Only display type
+   switches by script, below. */
 body {
   margin: 0;
   background: var(--surface);
   color: var(--ink);
-  font-family: var(--font-dev);
+  font-family: var(--font-body);
   font-size: var(--step-0);
   line-height: var(--leading-body);
   -webkit-font-smoothing: antialiased;
 }
 
-:lang(en) { font-family: var(--font-lat); }
-
+/* Display type: serif, and it must match the script it sets. A Devanagari
+   headline in a Latin serif falls back to a stack that was never designed for
+   it, which is the failure this pairing exists to avoid. */
 h1, h2, h3 {
-  font-family: var(--font-dev);
+  font-family: var(--font-display-dev);
   font-weight: 400;
   line-height: var(--leading-head);
   margin: 0;
+}
+
+h1:lang(en), h2:lang(en), h3:lang(en) {
+  font-family: var(--font-display-lat);
 }
 
 a { color: var(--cta); }
@@ -54,7 +62,7 @@ a:visited { color: var(--visited); }
 .brand { display: flex; align-items: center; gap: .65rem; }
 .brand img { width: 44px; height: 44px; border-radius: 50%; }
 .brand b {
-  font-family: var(--font-lat);
+  font-family: var(--font-display-lat);
   font-size: var(--step-1);
   font-weight: 600;
   letter-spacing: .07em;
@@ -62,7 +70,7 @@ a:visited { color: var(--visited); }
   line-height: 1;
 }
 .brand i {
-  font-family: var(--font-lat);
+  font-family: var(--font-display-lat);
   font-style: normal;
   font-size: .62rem;
   letter-spacing: .24em;
@@ -82,12 +90,24 @@ a:visited { color: var(--visited); }
   content: '';
   position: absolute;
   inset: 0;
+  /* Fallback first: literal rgb of --surface (#FFF8E8). Kept in sync by the
+     contrast lint, which fails if these triplets stop matching the token —
+     the previous pair was hand-inlined and silently held the OLD ivory. */
   background: linear-gradient(
     90deg,
     var(--surface) 0,
     var(--surface) 30%,
-    rgba(247, 241, 227, .86) 44%,
-    rgba(247, 241, 227, 0) 62%
+    rgba(255, 248, 232, .86) 44%,
+    rgba(255, 248, 232, 0) 62%
+  );
+  /* Preferred: derives from the token, so it can never drift. Browsers without
+     color-mix() keep the declaration above. */
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0,
+    var(--surface) 30%,
+    color-mix(in srgb, var(--surface) 86%, transparent) 44%,
+    color-mix(in srgb, var(--surface) 0%, transparent) 62%
   );
 }
 .heroin {
@@ -150,7 +170,7 @@ section { padding-block: var(--s6); }
   border-top: 1px solid var(--rule);
 }
 .person span {
-  font-family: var(--font-lat);
+  font-family: var(--font-display-lat);
   font-size: var(--step-2);
   color: var(--ink-soft);   /* was --accent: 2.96:1, gold is never text */
   line-height: 1;
@@ -172,7 +192,10 @@ footer {
 footer a { color: var(--dark-text); }
 footer a:visited { color: var(--dark-text); }
 footer .brand b, footer .brand i { color: var(--dark-text); }
-.legal { margin-top: var(--s3); line-height: 1.9; color: #9C8770; }
+/* Was a hardcoded #9C8770 — measured 3.93:1 on the dark ground, i.e. it had
+   been failing AA silently since it was written. --dark-muted is 6.33:1 and
+   the lint now checks it. */
+.legal { margin-top: var(--s3); line-height: 1.9; color: var(--dark-muted); }
 
 /* ── Motion: transform only, never opacity ───────────────────── */
 @media (prefers-reduced-motion: no-preference) {

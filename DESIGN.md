@@ -12,67 +12,132 @@ the breakage is recorded — those are the rules people otherwise remove.
 
 ## 1. Colour
 
-Derived from `images/logo/stella.png`. The logo contains ivory, gold, terracotta,
-sage green and coral. It contains **no blue**, which is why the source documents'
-navy/sapphire direction is void (ADR-001).
+**Adopted from the Edition 2.0 brand system, 2026-09-14 (ADR-034.)** Verified
+against `images/logo/stella.png` — the zodiac wheel contains every one of these
+six colours: ivory panels, lotus cream, saffron gold ornament, a terracotta
+centre field, leaf green foliage and deep umber Devanagari. It contains **no
+blue**, which is why the source documents' navy/sapphire direction stays void
+(ADR-001).
 
 ```css
 :root{
-  --surface:   #F7F1E3;   /* ivory ground                              */
-  --surface-2: #FBF7EE;   /* raised panel                              */
-  --ink:       #2B1B10;   /* 14.8:1 on ivory — AAA                     */
-  --ink-soft:  #6B5643;   /*  5.1:1 on ivory — AA                      */
-  --cta:       #904000;   /* bronze, 6.4:1 — AA — buttons and links    */
-  --accent:    #C08000;   /* gold, 2.96:1 — ORNAMENT ONLY              */
-  --sage:      #6E7A52;   /* logo leaves — botanical detail only       */
-  --coral:     #D9705C;   /* hero flowers — botanical detail only      */
-  --rule:      rgba(192,128,0,.38);
+  /* surfaces */
+  --surface:     #FFF8E8;   /* warm ivory — brand ground                */
+  --surface-2:   #FFFDF8;   /* card surface                             */
+  --cream:       #F4E1BA;   /* lotus cream — highlighted bands          */
+  /* text and action */
+  --ink:         #48251C;   /* deep umber  12.75:1 on ivory — AAA       */
+  --ink-soft:    #6E4A38;   /* derived      7.35:1 — AA                 */
+  --cta:         #A94424;   /* terracotta   5.61:1 — AA — buttons/links */
+  --cta-hover:   #8E3A1E;   /* derived      7.15:1                      */
+  --visited:     #72301C;   /* derived      9.21:1                      */
+  /* accent and status */
+  --accent:      #D99A16;   /* saffron gold 2.31:1 — ORNAMENT ONLY      */
+  --leaf:        #4E682A;   /* leaf green   5.95:1 — status/secondary   */
+  --rule:        rgba(217,154,22,.38);
+  /* dark surfaces */
+  --dark-ground: #48251C;   --dark-panel:  #5C3225;
+  --dark-text:   #FFF8E8;   /* 12.75:1 — AAA                            */
+  --dark-soft:   #E3D5C0;   /*  9.34:1 — AA                             */
+  --dark-muted:  #C4AE97;   /*  6.33:1 — AA — legal and footnotes       */
+  --dark-border: #75503F;
 }
 ```
 
-### The gold rule
+**Edition 2.0 supplies six colours; the build needs sixteen.** It has no
+secondary-text, visited-link, hover or dark-surface values. The five derived
+tokens stay inside the umber/terracotta hue family and were each chosen by
+measurement, not by eye.
 
-**Gold is never text and never a button fill.** At 2.96:1 on ivory it fails WCAG
-AA for any text size. It is permitted only as hairline rules, thin borders and
-ornament.
+`#FFFAF0` — Edition 2.0's "lighter page background" — is **deliberately not
+tokenised**. It sits within 1% of `--surface`, and an unused token is a future
+inconsistency. Add it if something genuinely needs it.
 
-This is enforced by a **CI contrast lint**, not by discipline. The lint exists
-because gold is the brand's most recognisable colour and someone will reach for
-it as a heading within weeks. Verify the lint works by deliberately writing
-`color: var(--accent)` on body text and confirming the build fails.
+### The gold rule — now stricter
 
-Measured 2.96 confirms the 2.95 figure recorded in ADR-001 independently.
+**Gold is never text and never a button fill.** Saffron gold is **2.31:1** on
+ivory. It fails WCAG AA at every text size, and it fails *harder* than the
+previous gold did at 2.96:1 — so adopting the new palette **tightened** this
+rule rather than relaxing it.
+
+Permitted only as hairline rules, thin borders and ornament.
+
+Enforced by a **CI contrast lint**, not by discipline, because gold is the
+brand's most recognisable colour and someone will reach for it as a heading
+within weeks. A supplied mockup already does exactly this — small-caps gold
+display text on ivory. It is not buildable as drawn; use `--ink-soft`, or put
+it on a dark ground.
+
+Verify the lint works:
+
+```bash
+echo '.x{color:var(--accent)}' > apps/customer-web/app/probe.css
+npm run gate:contrast      # must fail
+rm apps/customer-web/app/probe.css
+```
+
+### Lotus cream is a content surface, and it is the thin one
+
+`--cta` on `--cream` is **4.61:1** — AA by a margin of 0.11. It is real and it
+passes, but nothing about it is comfortable: darkening the cream or lightening
+the terracotta by a hair breaks it silently. **The lint now checks this pair**
+rather than trusting anyone to remember.
 
 ### Dark surfaces
 
-The waitlist section inverts to `--ink` ground. On dark, gold **becomes**
-permissible for text and buttons — `#C08000` on `#2B1B10` is high contrast. The
-rule is about gold on ivory, not gold in general.
+Sections may invert to `--dark-ground`. On dark, gold **becomes** permissible for
+text and buttons — `#D99A16` on `#48251C` is 5.51:1. The rule is about gold on
+ivory, not gold in general.
+
+### Background treatment
+
+The ground is **warm ivory with a soft botanical watermark** — lotus petals and
+leaves, drawn large, held at very low contrast against `--surface`. It reads as
+texture, not as illustration. Two constraints:
+
+- **It must never compete with text.** Keep it under roughly 6% effective
+  contrast against `--surface`; if a headline sitting on it becomes harder to
+  scan, the pattern is too strong. The measured ratios in this section assume a
+  flat ground, and a busy watermark quietly invalidates them.
+- **It must not become a background image request on mobile.** Indian 4G is the
+  target network. Use a tiling asset or an inline SVG, sized in kilobytes.
+
+The zodiac wheel is the **single visual anchor** and appears once per page. Two
+ornaments of that weight compete and neither wins.
 
 ---
 
 ## 2. Typography
 
-Two families. Each chosen for the script it serves, not for decoration.
+**Serif display, sans body (ADR-035).** Three families, each doing one job.
 
 ```css
---dev: "Tiro Devanagari Hindi", Georgia, serif;   /* all Devanagari       */
---lat: "Cormorant Garamond", Georgia, serif;       /* Latin display + text */
+--font-display-lat: "Cormorant Garamond", Georgia, serif;   /* Latin headings  */
+--font-display-dev: "Tiro Devanagari Hindi", Georgia, serif;/* देवनागरी headings */
+--font-body:        "Mukta", system-ui, sans-serif;         /* all body + UI   */
 ```
 
+- **Mukta** (Ek Type) is a Devanagari-and-Latin superfamily. One family covers
+  both scripts, so **body copy needs no `:lang()` switch** — only headings switch.
 - **Tiro Devanagari Hindi** is a real Devanagari text serif designed for extended
-  reading. Hindi is the default language in India, so it must be first-class
-  rather than whatever the fallback stack produces.
-- **Cormorant Garamond** carries the heritage warmth of the gold brand for Latin.
-  It is light at small sizes — use 500/600 weight or step up a size for body copy.
+  reading. Hindi is the default in India; it must be first-class, not a fallback.
+- **Cormorant Garamond** carries the heritage warmth of the gold brand for Latin
+  display. It is light at small sizes — use 500/600, which is why body moved to
+  Mukta.
 
-**Inter, Roboto, Arial and system stacks are rejected.** Inter specifically is
-the documented "gave up on typography" signal, and it has **no Devanagari
-coverage at all**, which is disqualifying on a Hindi-first product.
+**Inter, Roboto, Arial and system stacks remain rejected.** Adopting a sans body
+does not resurrect Inter: it has **no Devanagari coverage at all**, which is
+disqualifying on a Hindi-first product. That is the reason — not inertia.
 
 Mark up mixed content with `lang` on every run — `lang="en"` on Latin passages
-inside Hindi pages — so screen readers switch voice. This is not optional
-polish; a Hindi headline announced in an English voice is unintelligible.
+inside Hindi pages — so screen readers switch voice **and headings pick the right
+display face**. This is not optional polish; a Hindi headline announced in an
+English voice is unintelligible, and one set in a Latin serif falls back to a
+stack never designed for the script.
+
+**Open visual check:** `--step-0` is `1.0625rem` because Cormorant is light at
+body size. Mukta is sturdier and may read correctly at `1rem`. Decide by looking
+at the rendered page, not by reasoning about it.
 
 ### Scale
 
@@ -106,12 +171,12 @@ every link, button and form control, including inline text links in the footer.
 
 ## 4. Components
 
-**Button.** Bronze fill, ivory text, 2px radius, `min-height: 44px`, padding
-`.7rem 1.35rem`. Hover `#7A3600`. Focus `3px solid var(--ink)` with `3px` offset.
-On dark surfaces the fill becomes gold with ink text.
+**Button.** Terracotta fill (`--cta`), ivory text, 2px radius, `min-height: 44px`,
+padding `.7rem 1.35rem`. Hover `--cta-hover`. Focus `3px solid var(--ink)` with
+`3px` offset. On dark surfaces the fill becomes gold with ink text.
 
-**Link.** `--cta` bronze. **Visited links must differ** — `#6E3200`. Retaining
-the visited state is a usability requirement, not a stylistic choice.
+**Link.** `--cta` terracotta. **Visited links must differ** — `--visited`.
+Retaining the visited state is a usability requirement, not a stylistic choice.
 
 **Form field.** Label is **always visible and persistent**. Placeholder-as-label
 is forbidden: the label must remain readable once the field has content. Hint
@@ -204,7 +269,7 @@ trust section of the landing page was invisible and the CSS looked correct.
 Must pass the trunk test: cover everything except the navigation and a visitor
 can still identify the site, the current section, and the primary action.
 
-- **≥861px** — brand left, section links right, bronze CTA last. Current section
+- **≥861px** — brand left, section links right, terracotta CTA last. Current section
   marked with `box-shadow: inset 0 -2px 0 var(--accent)`, not colour alone.
 - **≤860px** — section links are hidden, so a **sticky bottom bar** replaces
   them: three section links plus a wider CTA, each `min-height: 44px`. Hiding the
@@ -255,6 +320,8 @@ red fringing around the whole silhouette, mottled noise inside the plaque, and
 gold-on-gold lettering. Both supplied marks are also unreadable below roughly
 60px, so the compact mark is the roundel regardless of the wordmark's fate.
 
-**Unresolved:** the logo labels zodiac signs in Devanagari (मेष, वृषभ, मिथुन);
-the hero uses Western glyphs (♈♉♊). Two visual languages on one brand. The
-Kundli pages will force a choice.
+**Resolved 2026-09-14 — Devanagari sign names are canonical.** The supplied
+zodiac wheel labels every sign in Devanagari (मेष · वृषभ · मिथुन · कर्क …) and
+none in Western glyphs. So Devanagari is the house convention and `♈♉♊` are the
+outlier; where a Latin reader needs them, they are a secondary gloss, never the
+primary label. The Kundli pages no longer have a choice to make.

@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import './tokens.css';
+// Tokens come from the workspace package, never a copy inside this app. A
+// duplicate here meant the lint checked one file and the browser rendered
+// another (ADR-034). scripts/contrast-lint.mjs now fails if one reappears.
+import '@stella/design-system/tokens.css';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -20,7 +23,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#F7F1E3',
+  // Must track --surface in tokens.css. Next needs a literal here, so this is
+  // the one unavoidable duplicate; contrast-lint.mjs checks the two agree.
+  themeColor: '#FFF8E8',
   width: 'device-width',
   initialScale: 1,
 };
@@ -41,8 +46,10 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
+        {/* Serif display + Mukta body (ADR-035). Mukta covers Devanagari AND
+            Latin, so body copy needs no per-script switch; only headings do. */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Hindi&family=Cormorant+Garamond:wght@400;500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Mukta:wght@400;500;600&family=Tiro+Devanagari+Hindi&display=swap"
           rel="stylesheet"
         />
       </head>
