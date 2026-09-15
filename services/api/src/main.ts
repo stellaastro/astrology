@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { initSentry } from './observability/sentry';
@@ -27,6 +28,10 @@ async function bootstrap(): Promise<void> {
   // Behind nginx: trust the proxy so req.ip is the client, not 127.0.0.1.
   // Rate limiting and audit records are worthless if every request looks local.
   app.getHttpAdapter().getInstance().set('trust proxy', 'loopback');
+
+  // Session cookies are httpOnly, so the guard reads them here rather than
+  // from a header the browser would have to be trusted to send.
+  app.use(cookieParser());
 
   const port = Number(process.env.API_PORT ?? 4000);
   await app.listen(port, '127.0.0.1');

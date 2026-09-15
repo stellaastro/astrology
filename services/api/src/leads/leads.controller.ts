@@ -5,7 +5,9 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { LeadsService, UNIFORM_RESPONSE } from './leads.service';
 import { CreateLeadDto } from './create-lead.dto';
+import { Public } from '../auth/auth.guard';
 
+@Public()
 @Controller('public/leads')
 export class LeadsController {
   constructor(private readonly leads: LeadsService) {}

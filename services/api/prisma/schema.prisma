@@ -161,3 +161,89 @@ model OutboxMessage {
   @@index([processedAt, availableAt])
   @@map("outbox_messages")
 }
+
+/// A person who can sign in. One identity per human, carrying an additive set
+/// of roles (ADR-018) — the same account can be both astrologer and admin, so
+/// the audit trail can answer "who did this" without duplicate accounts.
+///
+/// Two sign-in paths, deliberately:
+///   - Customers use Google (ADR-037). No password is stored for them, which is
+///     the half of ADR-011 that still stands.
+///   - The admin uses a password (ADR-038). ADR-011 always allowed "a future
+///     password-based admin path"; this is it.
+model User {
+  id String @id @db.Char(26) // ULID
+
+  /// Always present, and the key Google sign-in resolves to. Unique because two
+  /// accounts for one address would fragment the audit trail.
+  email String  @unique @db.VarChar(320)
+  name  String? @db.VarChar(120)
+
+  /// Google's stable subject id. Null for password-only accounts (the admin).
+  /// Unique so one Google account cannot be attached to two users.
+  googleSub String? @unique @map("google_sub") @db.VarChar(64)
+
+  /// scrypt hash, "scrypt$N$r$p$salt$key" (node:crypto — no native dependency,
+  /// and a real memory-hard KDF rather than a bare digest). Null for everyone
+  /// except the admin: a password column that is usually null is the point,
+  /// not an oversight.
+  passwordHash String? @map("password_hash") @db.VarChar(255)
+
+  /// Additive roles as a JSON array of strings, e.g. ["admin:super"].
+  /// MySQL has no array type and a join table for a handful of roles on a dozen
+  /// users would cost more than it explains.
+  roles Json
+
+  /// Set when a human disables the account. Sessions are revoked separately —
+  /// this is the durable fact, the session store is the fast path.
+  disabledAt DateTime? @map("disabled_at")
+
+  /// Consecutive failed password attempts, and the time a lockout expires.
+  /// Password-only admin (ADR-038) makes brute-force the whole attack surface,
+  /// so the counter is durable rather than in-memory: restarting the API must
+  /// not clear a lockout.
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+  lastLoginAt      DateTime? @map("last_login_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sessions Session[]
+
+  @@index([disabledAt])
+  @@map("users")
+}
+
+/// Server-side sessions (ADR-039, plan 3.2).
+///
+/// The reason this table exists rather than a self-contained token: revocation.
+/// A signed token is valid until it expires, so disabling an account would not
+/// end a live session. Revocation has to be a lookup against something the
+/// server can change, which means a row.
+///
+/// The cookie carries a random id; only its SHA-256 lands here, so a dump of
+/// this table does not let anyone resume a session.
+model Session {
+  /// SHA-256 of the cookie value, hex. Never the cookie value itself.
+  tokenHash String @id @map("token_hash") @db.Char(64)
+
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Recorded to show a person their own sessions, and to make a stolen cookie
+  /// visible in the audit trail.
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  expiresAt  DateTime  @map("expires_at")
+  /// Set when revoked. Kept rather than deleted so "when did this end, and why"
+  /// stays answerable; the scheduler purges rows well past expiry.
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}

@@ -1220,3 +1220,105 @@ guard.
    real handset.
 
 Detail: `docs/architecture/DEVELOPMENT_DATA_PLAN.md`.
+
+---
+
+## ADR-037 — Google sign-in for customers, not phone OTP
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Supersedes:** ADR-011's choice of
+phone + OTP as the primary factor, and the phone-number premise of ADR-018
+
+**Decision, by the owner.** Customers sign in with Google. Phone OTP is dropped.
+
+**What this removes from the critical path.** Phone OTP required TRAI DLT
+registration (weeks, never started), per-message SMS cost, and defences against
+SMS-pumping fraud — which plan task 3.4 called a *billing* denial of service,
+with India the top region for it. All three disappear. This is also consistent
+with a decision already taken: the waitlist is email-primary (task 2.1)
+*because* DLT registration had not started.
+
+**What it costs.** Anyone without a Google account cannot sign in. At roster 3,
+pre-revenue, that is an acceptable trade; a second provider can be added later
+without changing anything below the provider boundary.
+
+**Plumbing: direct Google OAuth, not Firebase.** Firebase was chosen in ADR-011
+largely *for* phone OTP. With that gone, its remaining value is token issuance
+and revocation — and Stella already needs its own session store for revocation
+(ADR-039), so Firebase would duplicate it. Direct OAuth removes a vendor, a
+project to provision, and a service-account JSON file on disk.
+
+**Consequence.** `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_SERVICE_ACCOUNT_PATH` in
+`.env.example` are dead. **Not yet implemented:** this needs an OAuth client in
+Google Cloud Console, which is an owner action. The identity substrate — users,
+sessions, guards — is built and is provider-agnostic; Google sign-in attaches to
+`users.google_sub`.
+
+---
+
+## ADR-038 — The admin account uses a password, and only a password
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Supersedes:** ADR-018's
+step-up MFA requirement for admin surfaces
+
+**Decision, by the owner.** One admin account, `admin@stellaastro.com`, signing
+in with a password. No second factor.
+
+**This is permitted by ADR-011, which is worth stating** because it looks like a
+contradiction. ADR-011 says Stella stores no password hashes *for customers*,
+and explicitly reserves "any future password-based admin path". This is that
+path. Customers still have no password.
+
+**The risk, recorded rather than argued.** This account adjudicates no-shows,
+approves refunds, and can read every lead's email address. With one factor, a
+single guessed, reused or phished password is full access. A second factor was
+offered — TOTP, free, no SMS, no phone dependency — and declined in favour of
+shipping. **ADR-018's MFA requirement is superseded, not met.**
+
+**What is done instead**, since the password is the entire barrier:
+
+- **scrypt** (N=65536, r=8, p=1) via `node:crypto` — memory-hard, no native
+  dependency. Parameters are stored in each hash, so the cost can be raised
+  later without locking anyone out; an old hash is upgraded on next login.
+- **A durable lockout**: 5 failures locks the account for 15 minutes, counted in
+  the database rather than memory, so restarting the API does not clear it.
+- **Rate limiting** at 5 attempts per minute per IP — a different attack from
+  the lockout: one stops an account being ground down, the other stops one IP
+  spraying many.
+- **No enumeration**: wrong password and unknown account return a byte-identical
+  message, and the unknown path verifies against a dummy hash so it costs the
+  same ~500ms. Response time alone would otherwise say which accounts exist.
+- **Every attempt audited** — success, failure, lockout, unknown account —
+  with the IP. The password never appears in any form.
+- **A 12-character minimum**, length only. Composition rules push people towards
+  `Password1!` and measurably reduce entropy.
+
+**Revisit before Phase 7.** Once real money moves, one factor on the account
+that approves refunds should be reconsidered.
+
+---
+
+## ADR-039 — Sessions are rows, not self-contained tokens
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Implements:** plan task 3.2
+
+**Decision.** A `sessions` table. The cookie carries 32 random bytes; the table
+stores their SHA-256.
+
+**Why not a signed token.** A self-contained token is valid until it expires.
+Disabling an account, or a person signing out on a lost phone, would not end a
+session already open — the holder keeps access until the clock runs out.
+Revocation has to be a lookup against something the server can change. That is a
+row, and it means one database read per authenticated request. **That read is
+the feature, not the cost.**
+
+**Only the hash is stored**, for the same reason a password column holds a hash:
+a dump of this table must not let anyone resume a session. SHA-256 rather than a
+slow KDF is correct here — the token is already 256 bits from a CSPRNG, so there
+is no guessing attack for a slow hash to frustrate, and this runs on every
+request.
+
+**Revoked rows are kept, not deleted**, so "when did that session end" stays
+answerable; the scheduler purges a week past expiry.
+
+**The guard denies by default.** A route is public only if it says `@Public()`,
+so an endpoint added without thinking is closed rather than open.
