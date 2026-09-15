@@ -272,6 +272,10 @@ model User {
   /// signed in (ADR-043).
   astrologer Astrologer?
 
+  /// Bookings this account made as a CUSTOMER. A customer is a User with no
+  /// roles (ADR-036); there is no separate table.
+  bookings Booking[]
+
   @@index([disabledAt])
   @@index([isDevFixture])
   @@index([fixtureDataset])
@@ -400,6 +404,7 @@ model Astrologer {
 
   availabilityRules  AvailabilityRule[]
   availabilityBlocks AvailabilityBlock[]
+  bookings           Booking[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -473,4 +478,90 @@ model AvailabilityBlock {
 
   @@index([astrologerId, startsAt])
   @@map("availability_blocks")
+}
+
+/// A booked consultation slot (ADR-046).
+///
+/// THE SLOT IS HELD BY THIS ROW, not by Redis (ADR-029). A hold must outlive
+/// the entire Razorpay flow, and a UPI collect request pends for minutes —
+/// long enough that any sensible cache TTL would expire mid-payment and sell
+/// the slot twice. Redis may cache this for the UI; it may never own it.
+model Booking {
+  id String @id @db.Char(26) // ULID
+
+  astrologerId String     @map("astrologer_id") @db.Char(26)
+  /// onUpdate: NoAction is REQUIRED, not a preference. MySQL refuses a foreign
+  /// key with CASCADE on a column that feeds a STORED GENERATED column, and
+  /// astrologer_id feeds slot_key — the CREATE fails with error 1215. Costs
+  /// nothing: ULIDs are never updated.
+  astrologer   Astrologer @relation(fields: [astrologerId], references: [id], onUpdate: NoAction)
+
+  customerId String @map("customer_id") @db.Char(26)
+  customer   User   @relation(fields: [customerId], references: [id])
+
+  /// UTC instants (task 6.5). The astrologer's availability RULE is IST
+  /// wall-clock; the booked slot is a moment in the world.
+  slotStart DateTime @map("slot_start")
+  slotEnd   DateTime @map("slot_end")
+
+  /// held · confirmed · cancelled · expired · completed · no_show
+  status String @db.VarChar(16)
+
+  /// THE SLOT-OCCUPANCY KEY — a STORED GENERATED COLUMN, created by raw SQL in
+  /// the migration because Prisma cannot express one.
+  ///
+  /// NULL when the row does not occupy its slot, otherwise
+  /// `astrologer_id + '#' + slot_start`. MySQL permits unlimited NULLs in a
+  /// unique index, so a unique index on this yields exactly the filtered
+  /// uniqueness MySQL's lack of partial indexes otherwise denies (ADR-029).
+  ///
+  /// A plain UNIQUE(astrologer_id, slot_start) — the PostgreSQL habit — would
+  /// block that slot FOR EVER after one cancellation, and would surface as
+  /// astrologers asking why their afternoons vanished.
+  ///
+  /// NEVER WRITTEN BY THE APPLICATION. MySQL computes it.
+  slotKey String? @map("slot_key") @db.VarChar(64)
+
+  /// PRICE SNAPSHOT, frozen at creation and never recomputed (§79). Reading
+  /// the price back through astrologers.session_rate_paise would rewrite the
+  /// price of every past booking the moment someone edits a rate.
+  pricePaise     Int @map("price_paise")
+  sessionMinutes Int @map("session_minutes")
+
+  /// TAX COLUMNS, present from THIS migration deliberately (task 6.4).
+  ///
+  /// Under pay-at-booking the invoice is issued at booking, and adding a tax
+  /// split to already-paid rows is the uncorrectable retrofit the plan exists
+  /// to avoid. They are NULLABLE only because the rate is unanswered (owner
+  /// action O6: is Stella principal or agent for GST?). Phase 7 computes them
+  /// and a booking cannot be CONFIRMED without them — an unpaid held row may
+  /// carry nulls; a paid one may not.
+  taxableValuePaise Int?    @map("taxable_value_paise")
+  /// Basis points: 1800 = 18%. An integer, because a percentage as a float is
+  /// the same mistake as rupees as a float.
+  taxRateBp         Int?    @map("tax_rate_bp")
+  taxAmountPaise    Int?    @map("tax_amount_paise")
+  sacCode           String? @map("sac_code") @db.VarChar(16)
+  placeOfSupply     String? @map("place_of_supply") @db.VarChar(2)
+
+  /// When an unconfirmed hold lapses. The generated column cannot reference
+  /// NOW(), so expiry is MATERIALISED by the reaper flipping status — which is
+  /// what makes the hold durable rather than a clock the database consults.
+  holdExpiresAt DateTime? @map("hold_expires_at")
+
+  confirmedAt DateTime? @map("confirmed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  /// One key, one booking (task 6.3). A double-click creating two Razorpay
+  /// orders for one slot is the most likely launch incident: the unique index
+  /// on slot_key protects the SLOT, this protects the CUSTOMER'S CARD.
+  idempotencyKey String? @unique @map("idempotency_key") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([astrologerId, slotStart])
+  @@index([customerId])
+  @@index([status, holdExpiresAt])
+  @@map("bookings")
 }

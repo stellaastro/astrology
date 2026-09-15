@@ -1667,3 +1667,70 @@ used to discover which profiles exist but are unpublished.
 booking. There are no bookings yet, so there is nothing to orphan — this lands
 with Phase 6, and the rule belongs next to the booking model rather than
 guessed at now.
+
+---
+
+## ADR-046 — The booking schema, and the two MySQL facts that shape it
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Tasks:** 6.1, 6.2, 6.3, 6.4
+
+**Decision.** The `Booking` model lands before any booking code, because the
+parts of it that are wrong are the parts that cannot be fixed later.
+
+### 1. Slot uniqueness — the generated column (6.1)
+
+Implemented as ADR-029 specified: `slot_key` is a **STORED GENERATED** column,
+NULL for rows that do not occupy their slot, carrying a unique index. MySQL
+permits unlimited NULLs in a unique index, which is the filtered uniqueness it
+otherwise denies.
+
+**Occupying by default.** The expression lists the statuses that FREE the slot
+(`cancelled`, `expired`) rather than those that hold it, so a status added later
+occupies until someone decides otherwise. The failure mode of forgetting is then
+a slot that looks busy — visible and annoying — rather than one sold twice.
+
+**It cannot consult NOW().** Generated-column expressions must be
+deterministic, so an expired hold keeps its slot until the reaper flips the
+status. That is not a limitation to work around; it is what makes the hold
+durable rather than a clock the database reads (6.2).
+
+**Verified against MySQL, not reasoned about:** a second hold on the same slot
+is refused (P2002); a different astrologer at the same instant is allowed;
+after cancelling, `slot_key` goes NULL and the slot **rebooks** — the exact case
+a plain `UNIQUE(astrologer_id, slot_start)` would block for ever; and an
+expired hold releases the same way.
+
+**A MySQL restriction found the hard way.** A foreign key whose column feeds a
+stored generated column **cannot use CASCADE**. `astrologer_id` feeds
+`slot_key`, so Prisma's default `ON UPDATE CASCADE` fails with error **1215** —
+which reports as "cannot add foreign key constraint" and says nothing about
+generated columns. Proven by adding both variants by hand: CASCADE fails,
+RESTRICT succeeds, and the same CASCADE on `customer_id` (not a base column) is
+fine. `onUpdate: NoAction` is now in the schema so a regenerated migration keeps
+it. It costs nothing — ULIDs are never updated.
+
+### 2. The price snapshot and the tax columns (6.4)
+
+`price_paise` is frozen at creation and never recomputed (§79). Reading a past
+booking's price back through `astrologers.session_rate_paise` would rewrite
+every historical price the moment someone edits a rate.
+
+The **tax columns are present from this migration**, before anything computes
+them, because under pay-at-booking the invoice is issued at booking and adding a
+tax split to already-paid rows is the uncorrectable retrofit the plan exists to
+avoid. They are nullable **only** because the rate is unanswered (owner action
+O6: principal or agent for GST?). The invariant Phase 7 enforces: an unpaid held
+row may carry nulls; a confirmed one may not.
+
+`tax_rate_bp` is basis points — an integer. A percentage stored as a float is
+the same mistake as rupees stored as a float.
+
+### 3. Idempotency (6.3)
+
+`idempotency_key` is unique. The slot index protects the SLOT; this protects the
+CUSTOMER'S CARD. A double-click creating two Razorpay orders for one slot is the
+most likely launch incident.
+
+**Not yet built:** the booking service itself, reschedule (6.6), the overrun
+policy (6.7), the reaper (6.10). 6.8 needs 100ms (Phase 8), 6.9 needs a second
+admin (O5), 6.11 needs TRAI DLT.
