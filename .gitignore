@@ -104,3 +104,6 @@ images/logo/*
 # add another permanent copy. Run `npm run build:assets` to regenerate.
 apps/customer-web/public/*.webp
 apps/customer-web/public/favicon.png
+.next-dev/
+.next-prod/
+.next-release-*/
