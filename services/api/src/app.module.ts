@@ -14,8 +14,20 @@ import { LeadsModule } from './leads/leads.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // The repo root .env, two levels up from services/api.
-      envFilePath: ['../../.env'],
+      /*
+       * The repo root .env is the DEVELOPMENT default. Production points
+       * ENV_FILE at a file outside the docroot (see the stella-api systemd
+       * drop-in), because .env carries APP_ENV=development and a DATABASE_URL
+       * for stellaastro_dev.
+       *
+       * This is not cosmetic. Setting DATABASE_URL in the unit alone did NOT
+       * work: ConfigModule loads the env file over the top of the process
+       * environment, so the live public API kept writing to the dev database —
+       * which holds synthetic fixture rows — while systemd insisted it was
+       * production. Selecting the whole FILE is unambiguous in a way that
+       * overriding individual variables was not.
+       */
+      envFilePath: [process.env.ENV_FILE ?? '../../.env'],
     }),
     // In-process cron. Single instance only — see SchedulerService.
     ScheduleModule.forRoot(),
