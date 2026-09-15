@@ -9,6 +9,7 @@ import { FixtureGuard } from './prisma/fixture-guard';
 import { HealthController } from './health/health.controller';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { LeadsModule } from './leads/leads.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -41,6 +42,8 @@ import { LeadsModule } from './leads/leads.module';
     PrismaModule,
     CoreModule,
     LeadsModule,
+    // Registers the outbox handler that sends waitlist confirmations.
+    MailModule,
   ],
   controllers: [HealthController],
   providers: [
