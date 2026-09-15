@@ -188,10 +188,17 @@ export default async function Home() {
         <div className="wrap">
           <div className="sechead">
             <h2>हमारे संस्थापक ज्योतिषी</h2>
+  
             <p lang="en">
-              Three practising astrologers, named and accountable. Full
-              profiles, availability and fees will be published when bookings
-              open.
+              {/* The count follows the data. It was the word "Three", which was
+                  true of the launch roster and silently wrong the moment
+                  recruiting adds anyone — and already wrong on the review
+                  server, which shows seventeen. */}
+              {astrologers && astrologers.length > 0
+                ? `${astrologers.length} practising ${astrologers.length === 1 ? 'astrologer' : 'astrologers'}, named and accountable.`
+                : 'Practising astrologers, named and accountable.'}{' '}
+              Full profiles, availability and fees will be published when
+              bookings open.
             </p>
           </div>
 

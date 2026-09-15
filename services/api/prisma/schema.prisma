@@ -252,6 +252,16 @@ model User {
   lockedUntil      DateTime? @map("locked_until")
   lastLoginAt      DateTime? @map("last_login_at")
 
+  /// Dev fixture marking (ADR-026, ADR-036).
+  ///
+  /// Users had no marker until dummy CUSTOMERS were seeded, and without one the
+  /// boot guard could not see them: a contaminated production users table would
+  /// have reported all clear. Customers are Users — a customer is simply an
+  /// account with no admin or astrologer role — so this is the column that makes
+  /// a synthetic customer detectable.
+  isDevFixture   Boolean @default(false) @map("is_dev_fixture")
+  fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -263,6 +273,8 @@ model User {
   astrologer Astrologer?
 
   @@index([disabledAt])
+  @@index([isDevFixture])
+  @@index([fixtureDataset])
   @@map("users")
 }
 

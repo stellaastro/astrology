@@ -23,6 +23,7 @@
 import { PrismaClient } from '@prisma/client';
 import { monotonicFactory } from 'ulid';
 import { seedAstrologers, DATASET } from './astrologers';
+import { seedCustomers, DATASET as CUSTOMER_DATASET } from './customers';
 import { assertDevelopment } from './guard';
 
 const nextId = monotonicFactory();
@@ -64,6 +65,9 @@ export async function seed(prisma: PrismaClient): Promise<void> {
 
   const astrologers = await seedAstrologers(prisma);
   console.log(`  seeded ${astrologers} development astrologers (dataset ${DATASET})`);
+
+  const customers = await seedCustomers(prisma);
+  console.log(`  seeded ${customers} development customers (dataset ${CUSTOMER_DATASET})`);
 }
 
 if (require.main === module) {

@@ -42,6 +42,8 @@ export class FixtureGuard implements OnApplicationBootstrap {
         .then((n) => ['leads', n] as const),
       this.prisma.astrologer.count({ where: { isDevFixture: true } })
         .then((n) => ['astrologers', n] as const),
+      this.prisma.user.count({ where: { isDevFixture: true } })
+        .then((n) => ['users', n] as const),
     ]);
 
     const contaminated = counts.filter(([, n]) => n > 0);

@@ -76,17 +76,28 @@ export class AstrologersService {
   /**
    * The public roster.
    *
-   * isDevFixture: false is belt AND braces. The boot guard already refuses to
-   * serve when fixtures exist under a production profile, but that guard
-   * protects production only — without this filter a demo of the public page
-   * in development would show twenty invented practitioners and look right.
+   * FIXTURES ARE EXCLUDED UNLESS EXPLICITLY ALLOWED, and the switch is its own
+   * variable rather than APP_ENV.
+   *
+   * ADR-036 wants dev and staging to be 100% synthetic — that is the point of
+   * a review server: to see the page populated. But an unconditional filter
+   * meant the review server showed an empty roster, and making it depend on
+   * APP_ENV would collapse two independent controls into one variable: the
+   * boot guard already keys on APP_ENV, so a single wrong value would disable
+   * both at once and put invented practitioners on a live site.
+   *
+   * PUBLIC_SHOW_FIXTURES has to be set deliberately, and is set only in
+   * .env.review. Getting APP_ENV wrong in production is not enough to expose
+   * a fixture; someone would have to add this as well.
    */
   async listPublic(): Promise<PublicAstrologer[]> {
+    const showFixtures = process.env.PUBLIC_SHOW_FIXTURES === 'true';
+
     const rows = await this.prisma.astrologer.findMany({
       where: {
         publishedAt: { not: null },
         retiredAt: null,
-        isDevFixture: false,
+        ...(showFixtures ? {} : { isDevFixture: false }),
       },
       /*
        * INSERTION ORDER, not experience.

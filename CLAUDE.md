@@ -165,7 +165,13 @@ miss:**
    triggers, no grant restrictions. Code never updates or deletes it, so the
    property holds by convention only.
 
-**Two operational facts that bite:**
+**The review server (:8434) now has its own API and database.** It runs the
+synthetic roster against `stellaastro_dev` via `stella-api-dev` on port 4001.
+Until 2026-09-15 it proxied to the production API, so it showed production data
+and **any form submitted there wrote to production**. See
+`docs/REVIEW_SERVER.md`.
+
+**Three operational facts that bite:**
 
 1. **Deploying the web app means building a NEW release directory** and pointing
    `NEXT_DIST_DIR` at it in the `stella-web` systemd drop-in. Building
@@ -174,6 +180,12 @@ miss:**
    `/home/stellaastro/secrets/api.production.env`**, not the repo `.env` — which
    is the development default and points at `stellaastro_dev`. See
    `infrastructure/api-production/README.md`.
+
+3. **MIGRATE BEFORE YOU RESTART.** Restarting the API with a build whose schema
+   is ahead of the database took production down for two minutes on 2026-09-15:
+   Prisma threw P2022 on a missing column and the service crash-looped behind a
+   502. `MigrationGuard` now refuses to boot and names the pending migrations,
+   but the order is still migrate → build → restart.
 
 Free tools (Kundli, horoscope, panchang) are **deferred past first revenue** —
 they are acquisition infrastructure for a scale that does not exist at roster 3.

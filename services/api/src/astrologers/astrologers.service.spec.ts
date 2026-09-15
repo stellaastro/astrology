@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AstrologersService } from './astrologers.service';
 import type { CreateAstrologerDto } from './astrologer.dto';
@@ -63,6 +63,7 @@ const dto = (over: Partial<CreateAstrologerDto> = {}): CreateAstrologerDto =>
 
 describe('the public roster is real or empty', () => {
   it('asks for published, non-retired, non-fixture rows only', async () => {
+    delete process.env.PUBLIC_SHOW_FIXTURES;
     const h = harness();
     await h.svc.listPublic();
     const q = arg<{ where: Record<string, unknown> }>(h.prisma.astrologer.findMany, 0, 0);
@@ -267,5 +268,39 @@ describe('the astrologer own-profile lookup', () => {
     const h = harness();
     h.prisma.astrologer.findUnique = vi.fn(async () => null) as never;
     await expect(h.svc.findForUser('U9')).rejects.toThrow(/not linked/);
+  });
+});
+
+describe('PUBLIC_SHOW_FIXTURES', () => {
+  const saved = { ...process.env };
+  afterEach(() => { process.env = { ...saved }; });
+
+  it('is OFF by default — an unset variable must never expose fixtures', async () => {
+    delete process.env.PUBLIC_SHOW_FIXTURES;
+    const h = harness();
+    await h.svc.listPublic();
+    expect(arg<{ where: Record<string, unknown> }>(h.prisma.astrologer.findMany, 0, 0).where.isDevFixture)
+      .toBe(false);
+  });
+
+  it.each(['1', 'yes', 'TRUE', 'development', ''])(
+    'stays off for %s — only the exact string "true" opts in',
+    async (value) => {
+      process.env.PUBLIC_SHOW_FIXTURES = value;
+      const h = harness();
+      await h.svc.listPublic();
+      expect(arg<{ where: Record<string, unknown> }>(h.prisma.astrologer.findMany, 0, 0).where.isDevFixture)
+        .toBe(false);
+    },
+  );
+
+  it('shows fixtures when set to exactly "true"', async () => {
+    process.env.PUBLIC_SHOW_FIXTURES = 'true';
+    const h = harness();
+    await h.svc.listPublic();
+    // The key must be ABSENT, not set to true: `isDevFixture: true` would show
+    // ONLY fixtures and hide the real roster.
+    expect('isDevFixture' in arg<{ where: Record<string, unknown> }>(h.prisma.astrologer.findMany, 0, 0).where)
+      .toBe(false);
   });
 });
