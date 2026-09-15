@@ -611,3 +611,12 @@ footer :focus-visible,
 .signinForm :focus-visible {
   outline-color: var(--ink);
 }
+
+/* A form wants a comfortable measure, not the full content width. Applies to
+   the waitlist and to the privacy request form, which is the same shape.
+
+   This rule existed once and was deleted by accident: the sign-in rewrite
+   replaced everything between the sign-in and focus-ring sections, and this
+   sat between them. Nothing failed — the panels just quietly went full width,
+   which is why it was caught by looking at the page rather than by any gate. */
+.waitlistPanel { max-width: 34rem; }
