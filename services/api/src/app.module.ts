@@ -11,6 +11,7 @@ import { SchedulerService } from './scheduler/scheduler.service';
 import { LeadsModule } from './leads/leads.module';
 import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
+import { AdminModule } from './admin/admin.module';
 import { AuthGuard } from './auth/auth.guard';
 
 @Module({
@@ -48,6 +49,8 @@ import { AuthGuard } from './auth/auth.guard';
     MailModule,
     // Sessions, password sign-in, and the guard below.
     AuthModule,
+    // Role-guarded admin surfaces.
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [
