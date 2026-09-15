@@ -86,13 +86,19 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 - **Fake data, real everything else** (ADR-036). Dev and staging run on a fully synthetic roster — that is intended. What must stay real in every environment: the database, authorization, constraints, the state machine, the arithmetic and the API contract. **A screen driven by a fixture is never evidence that the integration works.** Sandbox webhooks get the same signature verification as live ones. Provider failure surfaces as an error or a pending state — never as a fake success.
 - **Never send an OTP, SMS or email to an invented number or address.** Invented numbers belong to real people. Use owned test accounts, provider test destinations or a local sink. The directors' real mobile numbers must never become test recipients.
 - No invented user counts, ratings or testimonials on the landing page (§13).
+- **Personal data never enters the audit log.** It is append-only, so anything
+  written there can never be erased — which would make DPDP erasure impossible
+  and "we deleted your data" false. Audit the actor, the action and the target's
+  ULID; never the email, phone or a hash of either (ADR-040). `leads.service`
+  and `privacy.service` both have tests that fail if it comes back.
 - Migrations for every schema change. Never alter schema silently.
 - Feature work goes on `feature/*` branches, never straight to `main` (§57).
 - Financial, security, KYC and astrology-engine code needs review before landing (§59).
 
 ## Phase
 
-**Phase 2 — public entry. Substantially complete; Phase 3 is next.** Build order:
+**Phase 3 — identity. Complete. Phase 4 (astrologer profiles) is next.**
+Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -105,6 +111,16 @@ endpoint, double opt-in with a real confirmation email, `/confirm`, navigation
 with a mobile sticky bar, and the accessibility pass. The site is live and the
 waitlist works end to end.
 
+**Phase 3 in full:** server-side sessions and a deny-by-default guard (ADR-039),
+Google sign-in (ADR-037), two admin identities (ADR-038), the audited admin lead
+read and CSV export, **DPDP access and erasure** (ADR-040) and **enforced data
+retention** (ADR-041). 3.1 and 3.4 (Firebase OTP and its rate limiting) are
+**moot, not skipped** — phone OTP was dropped with Firebase in ADR-037.
+
+**Phase 4 needs the synthetic roster first.** Task 1.9 was widened to ~20 dummy
+astrologers with bookings, consultation history and negative cases (ADR-036);
+Phase 4 builds against those, not against the three directors.
+
 **Still open in Phase 2:**
 
 - **2.8 legal pages — PARKED by the owner.** This is the Razorpay unblocker, and
@@ -113,6 +129,17 @@ waitlist works end to end.
   invention.
 - 2.14 referral codes · 2.15 a real transactional email provider · 2.16 signup
   counters. All P2.
+
+**Two open decisions recorded elsewhere, repeated here because they are easy to
+miss:**
+
+1. **How long confirmed leads are kept is unanswered** — the retention mechanism
+   ships switched off for them, deliberately, because deleting someone who asked
+   to hear when bookings open would silently break the waitlist's only promise
+   (ADR-041). Owner decision; `RETENTION_CONFIRMED_LEAD_DAYS` turns it on.
+2. **The audit log is documented as append-only but nothing enforces it** — no
+   triggers, no grant restrictions. Code never updates or deletes it, so the
+   property holds by convention only.
 
 **Two operational facts that bite:**
 

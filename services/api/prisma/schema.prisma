@@ -83,10 +83,51 @@ model Lead {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  /// DPDP access and erasure requests made by this person (ADR-040).
+  privacyRequests PrivacyRequest[]
+
   @@index([createdAt])
   @@index([referralCode])
   @@index([isDevFixture])
   @@map("leads")
+}
+
+/// A DPDP access or erasure request (ADR-040).
+///
+/// A lead has NO ACCOUNT, so the only way to authenticate one of these is to
+/// prove control of the address — the same thing double opt-in already proves.
+/// The emailed token is the proof; this row is its server-side half.
+model PrivacyRequest {
+  id String @id @db.Char(26) // ULID
+
+  /// SHA-256 of the emailed token, hex. Never the token itself — the same rule
+  /// as sessions: reading this table must not let anyone exercise a request.
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+
+  /// The subject. CASCADE is load-bearing: erasing the lead must also remove
+  /// the request that asked for it, or this table keeps a live pointer to a
+  /// person who has been deleted.
+  leadId String @map("lead_id") @db.Char(26)
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  /// 'access' or 'erasure'. A VarChar rather than a Prisma enum to match the
+  /// rest of this schema; the service validates it.
+  kind String @db.VarChar(16)
+
+  expiresAt   DateTime  @map("expires_at")
+  /// Set when exercised. Single use — a link that still works after it has been
+  /// used is a link that works for whoever later reads the mailbox.
+  completedAt DateTime? @map("completed_at")
+
+  /// Who asked, for the audit trail. Erased along with the row.
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([leadId])
+  @@index([expiresAt])
+  @@map("privacy_requests")
 }
 
 /// Append-only audit log (ADR: Phase 1 substrate).

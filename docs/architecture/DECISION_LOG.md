@@ -1346,3 +1346,89 @@ answerable; the scheduler purges a week past expiry.
 
 **The guard denies by default.** A route is public only if it says `@Public()`,
 so an endpoint added without thinking is closed rather than open.
+
+---
+
+## ADR-040 — DPDP access and erasure, verified by email
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Task:** 3.6
+
+**Decision.** A waitlist lead can ask for a copy of everything held about them,
+or ask for it to be deleted. Both are verified by a **one-time link emailed to
+the address in question**, valid for 24 hours and usable once.
+
+**Why email, and not something better.** A lead has **no account**. There is no
+session to authenticate against and no password to check. The only thing a
+person can actually prove about a waitlist entry is control of the address —
+which is exactly what double opt-in already proves (ADR-028). Anything else
+would either be weaker (trusting a typed address) or invented (asking for
+identity documents to release an email address, which collects more personal
+data than it protects).
+
+### Three consequences that shaped the design
+
+**1. The request endpoint is an enumeration oracle unless it is careful.**
+"We've sent you a link" versus "we hold nothing for you" answers the question
+*is this named person on an astrology waitlist*. On this service that is
+sensitive. The reply is byte-identical either way, and an unknown address
+creates no row, sends no mail and writes no audit event — each of those would
+be an observable side-channel. Same rule as the signup endpoint.
+
+**2. Erasure must be complete, or it must not claim to be.** Three places held
+a copy of the address and only one was the lead row:
+
+| Where | What was done |
+|---|---|
+| `leads` row | Deleted. `privacy_requests` cascade with it |
+| `outbox_messages.payload` | Deleted by `leadId`. Delivered rows kept their payload **for ever**, so without this the address outlived the erasure |
+| `audit_events.after` | **Stopped writing it at all** — see below |
+
+**3. The audit log is append-only, so personal data must never enter it.** The
+signup event carried the address. That made complete erasure impossible: the
+lead row could go, and the address would remain in an immutable event for ever,
+making "we have deleted your data" false. The fix is at the source — the event
+now records the ULID, the locale and the IP, and there is a test that fails if
+anyone puts the address back. Deleting audit rows was rejected as the fix; an
+audit log with a deletion path is not an audit log.
+
+**No hash of the address is kept either.** A SHA-256 of an email is trivially
+reversible for any address someone already suspects, so keeping one to "prove
+which record was erased" would leave behind precisely the residue erasure
+exists to remove. The lead's ULID proves a specific record was erased, on a
+date, under a specific request — which is what demonstrating compliance
+requires.
+
+**Erasure is POST-only.** Mail clients, link scanners and corporate security
+proxies all prefetch links. An erasure behind a GET would delete records before
+anyone clicked anything.
+
+**Known gap:** a restore from backup re-introduces rows erased since that dump.
+Re-applying completed erasures is a step in the restore and breach runbooks.
+
+---
+
+## ADR-041 — Data retention has numbers, and one deliberate blank
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Task:** 3.7
+
+**Decision.** Horizons are enforced by a daily job, not by intention. Full
+table and reasoning in `docs/policies/DATA_RETENTION.md`; the defaults in
+`RetentionService` are the policy.
+
+- Unconfirmed leads: **30 days.** Consent was never verified and they are
+  uncontactable by design, so there is no purpose to point at.
+- Delivered outbox messages: **30 days.** Payloads carry addresses.
+- Spent or expired privacy requests: **7 days.**
+- Audit events: **never**, and they hold no personal data (ADR-040).
+- Development fixtures: **never reaped**, at any horizon.
+
+**Confirmed leads have no default expiry, deliberately.** Someone who confirmed
+asked to be told when bookings open; deleting them at an invented twelve or
+twenty-four months would silently break the waitlist's only promise, and they
+would never learn why the email never came. How long that promise lasts is a
+business and legal question. **Owner decision** — the mechanism is built,
+tested and switched off, and `RETENTION_CONFIRMED_LEAD_DAYS` enables it with no
+code change.
+
+**Daily rather than hourly.** This deletes people's records, so an error in a
+horizon should have a day to be noticed rather than an hour.

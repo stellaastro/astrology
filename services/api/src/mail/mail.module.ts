@@ -1,6 +1,7 @@
 import { Module, Logger, type OnModuleInit } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { leadConfirmation } from './lead-confirmation';
+import { privacyVerification } from './privacy-verification';
 import { OutboxService } from '../outbox/outbox.service';
 
 /** Shape of the payload leads.service enqueues on 'lead.confirm'. */
@@ -58,11 +59,34 @@ export class MailModule implements OnModuleInit {
       await this.mail.send(payload.email, subject, text, html);
     });
 
+    /** DPDP access and erasure verification (ADR-040). */
+    this.outbox.register('privacy.verify', async (payload) => {
+      const p = payload as { email?: unknown; kind?: unknown; token?: unknown };
+      if (
+        typeof p.email !== 'string' ||
+        typeof p.token !== 'string' ||
+        (p.kind !== 'access' && p.kind !== 'erasure')
+      ) {
+        // Throw so the outbox retries and parks it. Silently dropping a
+        // statutory request is the one failure mode this must not have.
+        throw new Error('privacy.verify payload is missing email, kind or token');
+      }
+
+      const base = (process.env.PUBLIC_BASE_URL ?? '').replace(/\/+$/, '');
+      const { subject, text } = privacyVerification({
+        email: p.email,
+        kind: p.kind,
+        token: p.token,
+        baseUrl: base,
+      });
+      await this.mail.send(p.email, subject, text);
+    });
+
     this.log.log(
       this.mail.configured
-        ? 'Registered outbox handler for "lead.confirm"'
-        : 'Registered outbox handler for "lead.confirm" — but SMTP is NOT configured, ' +
-            'so confirmations will retry and park rather than send.',
+        ? 'Registered outbox handlers for "lead.confirm" and "privacy.verify"'
+        : 'Registered outbox handlers for "lead.confirm" and "privacy.verify" — but SMTP ' +
+            'is NOT configured, so both will retry and park rather than send.',
     );
   }
 }

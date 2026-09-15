@@ -52,7 +52,7 @@ export class MailService {
    *
    * @throws when SMTP is unconfigured or the send fails — see the class note.
    */
-  async send(to: string, subject: string, text: string, html: string): Promise<void> {
+  async send(to: string, subject: string, text: string, html?: string): Promise<void> {
     if (!this.configured) {
       throw new Error(
         'SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASSWORD). Refusing to ' +
@@ -61,7 +61,16 @@ export class MailService {
     }
 
     const from = process.env.MAIL_FROM ?? process.env.SMTP_USER;
-    const info = await this.getTransport().sendMail({ from, to, subject, text, html });
+    /*
+     * html is OPTIONAL. The privacy emails are deliberately plain text: they
+     * carry a one-time link to someone who may not have asked for it, and a
+     * plain-text message has no remote images to load, nothing to mis-render,
+     * and no way to disguise where the link goes.
+     */
+    const info = await this.getTransport().sendMail({
+      from, to, subject, text,
+      ...(html ? { html } : {}),
+    });
 
     // The recipient is deliberately NOT logged. It is the personal data this
     // system exists to protect, and a message id is enough to trace a delivery.

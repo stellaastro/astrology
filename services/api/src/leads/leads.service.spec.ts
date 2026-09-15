@@ -37,6 +37,35 @@ function harness(opts: { txImpl?: (cb: unknown) => Promise<unknown> } = {}) {
   return { svc, prisma, tx, audit, outbox, turnstile, created };
 }
 
+describe('LeadsService.create — audit holds no personal data', () => {
+  /*
+   * The audit log is APPEND-ONLY, so anything written here can never be
+   * erased. Until 2026-09-15 this event carried the signup address, which
+   * meant a DPDP erasure could delete the lead row and still leave the person's
+   * address in the system for ever — making "we have deleted your data" false.
+   *
+   * targetId identifies the lead, which is all the audit trail needs.
+   */
+  it('does not write the address into the audit event', async () => {
+    const h = harness();
+    await h.svc.create(dto({ email: 'someone@example.invalid' }), '203.0.113.1', 'UA');
+    const written = JSON.stringify(h.audit.record.mock.calls);
+    expect(written).not.toContain('someone@example.invalid');
+    expect(written).not.toContain('@');
+  });
+
+  it('still records enough to be useful', async () => {
+    const h = harness();
+    await h.svc.create(dto(), '203.0.113.1', 'UA');
+    const calls = (h.audit.record as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const first = calls[0];
+    if (!first) throw new Error('expected the audit to have been written');
+    const call = first[1] as { action: string; targetId: string };
+    expect(call.action).toBe('lead.create');
+    expect(call.targetId).toBe('L1');
+  });
+});
+
 describe('LeadsService.create', () => {
   it('creates a lead and returns the uniform response', async () => {
     const h = harness();
