@@ -225,12 +225,12 @@ label left and description right.
 ### Hero
 
 Full-bleed, one composition. The left ~45% is a text zone; the right ~55% is an
-**animated celestial scene** whose single anchor is the Devanagari zodiac wheel.
+**animated celestial scene** whose single anchor is an antique gold zodiac astrolabe.
 Budget: one eyebrow, one headline, one supporting sentence, one CTA group, one
 scene. No cards.
 
 Implemented in `apps/customer-web/app/_components/` — `StellaHero.tsx` (layout,
-copy, motion control, parallax), `StellaHero.module.css` (all hero styling),
+copy), `StellaHero.module.css` (all hero styling),
 `CelestialArt.tsx` (the artefacts).
 
 ### Three layers, and why
@@ -244,19 +244,26 @@ copy, motion control, parallax), `StellaHero.module.css` (all hero styling),
 3. **Stage** — a square coordinate space holding every animated object. All
    artefacts are positioned in `%`, so one `max-width` scales the composition.
 
-### Artefact wrappers: position → float → spin
+### Celestial foreground
 
-Each object is nested three deep, because a single element cannot hold two
-transforms without one overwriting the other:
+The hero uses six transparent WebP assets exported from
+`images/celestial/separated-sheet.png`: the main dial, full moon, Saturn, Mars,
+jade planet and crescent. The right-hand armillary globe has been removed.
+The original `assembly.png` remains available as the source reference.
+The asset builder removes the generated sheet's neutral checkerboard backdrop
+and extracts each object independently; the sheet and prompt are tracked.
 
-```
-.place   absolute position and size, no animation
-  .float gentle drift        (translate)
-    .spin rotation           (rotate)
-```
+The full stage uses scale(.968), another 10% increase from scale(.88).
+All layers share the fixed inward perspective tilt. The five satellite objects
+are spatially detached from the main dial and rotate about their own centres
+at independent speeds (42–96 seconds), with alternating directions. The SVG
+dial and orbital beads retain their existing animation. Reduced motion disables
+all rotations. No pointer tracking is used.
 
-The zodiac wheel turns once in **180s**. Planets drift 12px over 9–14s with
-varied delays so nothing pulses in unison.
+The hero fills the viewport below the shared 84px header. Its stage is bounded
+by available height, with a compact stacked layout on mobile. Very short or
+zoomed windows can grow vertically to keep content accessible. The supplied
+landscape covers the section at every breakpoint.
 
 ### Orbits: the bead follows the ellipse you can see
 
@@ -274,21 +281,14 @@ swing together and the scene would read as one spinning graphic.
   `@media (prefers-reduced-motion: no-preference)`.** Declaring it globally and
   disabling it under `reduce` would leave `fill-mode: both` holding
   `opacity: 0` — the DESIGN.md §6 failure, in a new place.
-- A **Pause animation** control sets `data-motion="paused"`, which pauses every
-  animation and zeroes the parallax. Parallax is additionally fine-pointer only.
+- Animations run automatically without play/pause controls or pointer parallax.
 - Reduced motion is honoured by **CSS, not component state** — state arrives
   after hydration and would let one animated frame through first.
 
 **Below 900px** the split stops working: the copy takes the full measure, the
 scene moves beneath it, and the jade planet, crescent and third orbit are
-dropped. The wheel stays. The hero also becomes `display: block` there, because
-the motion control is a sibling of the content and would otherwise become a
-second flex item beside the buttons.
+dropped. The wheel stays. The hero becomes `display: block` to stack the content.
 
-**Still to replace:** Saturn, the moon, both planets, the crescent and the
-armillary sphere are refined SVG stand-ins drawn from the palette, not
-commissioned artwork. Swap each `<svg>` for an `<img>` inside the same wrapper
-when real artwork exists — the animation layers do not change.
 
 ---
 

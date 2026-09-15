@@ -1,15 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /**
-   * The review server (`npm run dev:review`, port 3001) runs out of the SAME
-   * checkout as production. Without a separate build directory it would write
-   * its dev output straight over the `.next/` that `next start` is serving, and
-   * the live site would break the moment a file changed.
+   * PRODUCTION BUILDS GO IN `.next-prod`, dev stays on the default `.next`.
    *
-   * NEXT_DIST_DIR is set only by stella-dev.service. Everything else — local
-   * development, CI, the production build — keeps `.next`.
+   * The review server (`npm run dev:review`, :3001) runs out of the same
+   * checkout as the live site, so the two must not share a build directory.
+   *
+   * The first attempt pointed *dev* at a custom dir and left production on
+   * `.next`. That leaked: on a next.config.mjs change Next restarts and writes
+   * `.next/diagnostics/build-diagnostics.json` to the DEFAULT path regardless
+   * of distDir — straight into the directory the live site was serving. It only
+   * surfaced because that file happened to be root-owned, so the dev server
+   * crashed with EACCES instead of silently writing there.
+   *
+   * So it is inverted: dev keeps the default path Next insists on using, and
+   * production moves somewhere dev never touches. Keying off NODE_ENV rather
+   * than an explicit variable means it cannot be forgotten — `next build` and
+   * `next start` set it to production themselves, `next dev` to development.
    */
-  distDir: process.env.NEXT_DIST_DIR || '.next',
+  distDir: process.env.NEXT_DIST_DIR
+    || (process.env.NODE_ENV === 'production' ? '.next-prod' : '.next'),
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {

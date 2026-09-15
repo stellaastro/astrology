@@ -66,8 +66,9 @@ export function Saturn({ className }: P) {
         <ellipse cx="100" cy="100" rx="94" ry="26" fill="none"
                  stroke="url(#st-ring)" strokeWidth="9" opacity=".55" />
         <circle cx="100" cy="100" r="52" fill="url(#st-gold)" />
+        {[18, 22, 30, 34].map(ry => <ellipse key={ry} cx="100" cy="100" rx="94" ry={ry} fill="none" stroke="url(#st-ring)" strokeWidth=".8" opacity=".7" />)}
         {/* banding */}
-        <path d="M52 88h96M50 100h100M54 113h92" stroke="var(--ink)"
+        <path d="M65 66q35 12 70 0M56 77q44 13 88 0M52 88q48 13 96 0M50 100q50 13 100 0M54 113q46 13 92 0M61 127q39 10 78 0" stroke="var(--ink)"
               strokeWidth="2" opacity=".14" strokeLinecap="round" />
         {/* front half of the ring, drawn over the body */}
         <path d="M6 100a94 26 0 0 0 188 0" fill="none"
@@ -186,6 +187,26 @@ export function ArrowUpRight({ className }: P) {
          aria-hidden="true" focusable="false">
       <path d="M4 12L12 4M12 4H5.5M12 4v6.5" fill="none" stroke="currentColor"
             strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Fine engraved astronomical dial, independent of the brand wheel. */
+export function CelestialDial({ className }: P) {
+  return (
+    <svg className={className} viewBox="0 0 800 800" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="var(--accent)">
+        {[390, 373, 352, 338, 282].map(r => <circle key={r} cx="400" cy="400" r={r} strokeWidth={r === 373 ? 1.5 : .7} />)}
+        {Array.from({ length: 120 }, (_, i) => (
+          <path key={i} d={`M400 27v${i % 10 === 0 ? 35 : i % 5 === 0 ? 19 : 7}`} transform={`rotate(${i * 3} 400 400)`} strokeWidth={i % 10 === 0 ? 1.4 : .7} />
+        ))}
+        {Array.from({ length: 12 }, (_, i) => <path key={i} d="M400 62v56" transform={`rotate(${i * 30} 400 400)`} opacity=".5" />)}
+      </g>
+      <g fill="var(--ink-soft)" fontSize="20" textAnchor="middle" fontFamily="Georgia, serif">
+        {['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'].map((sign, i) => (
+          <text key={sign} x="400" y="99" transform={`rotate(${i * 30 + 15} 400 400)`}>{`${sign}\uFE0E`}</text>
+        ))}
+      </g>
     </svg>
   );
 }

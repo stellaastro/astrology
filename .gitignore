@@ -49,6 +49,8 @@ android/local.properties
 # ---------------------------------------------------------------------------
 .next/
 .next-dev/
+.next-prod/
+.next-release-*/
 out/
 dist/
 .turbo/
@@ -104,3 +106,14 @@ images/logo/*
 # add another permanent copy. Run `npm run build:assets` to regenerate.
 apps/customer-web/public/*.webp
 apps/customer-web/public/favicon.png
+
+# Source artwork required to reproduce the landing hero.
+!images/herosection/
+images/herosection/*
+!images/herosection/hero_bg.png
+!images/celestial/
+images/celestial/*
+!images/celestial/assembly.png
+!images/celestial/PROMPT.md
+
+!images/celestial/separated-sheet.png

@@ -18,9 +18,16 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    ".next-dev/types/**/*.ts",
+    ".next-prod/types/**/*.ts",
+    ".next-release-hero-objects/types/**/*.ts",
+    ".next-release-hero-small/types/**/*.ts",
+    ".next-release-hero-tilt/types/**/*.ts",
+    ".next-release-hero-viewport/types/**/*.ts",
+    ".next-release-hero/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-dev/types/**/*.ts"
+    ".next-release-hero-objects-larger/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

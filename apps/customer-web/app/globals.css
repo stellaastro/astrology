@@ -11,6 +11,8 @@
 
 * { box-sizing: border-box; }
 
+:root { --site-header-height: 84px; }
+
 /* Body is Mukta for BOTH scripts — it is a Devanagari+Latin superfamily, so
    there is no :lang() switch here any more (ADR-035). Only display type
    switches by script, below. */
@@ -56,10 +58,11 @@ a:visited { color: var(--visited); }
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
 }
+/* Gutter matches the hero's, so the brand sits directly above the headline
+   rather than floating in the middle of a full-bleed scene. */
 .topin {
-  max-width: var(--maxw);
-  margin-inline: auto;
-  padding: var(--s2) var(--s3);
+  height: calc(var(--site-header-height) - 1px);
+  padding: var(--s2) clamp(var(--s3), 5vw, var(--s6));
   display: flex;
   align-items: center;
 }
