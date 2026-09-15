@@ -172,6 +172,20 @@ These are not style preferences. Each cost real time to find.
   reach the site. Import `@stella/design-system/tokens.css`. The lint now fails
   if a second appears — and equally if an `rgba()` literal matches no token,
   because those silently keep the old palette.
+- **Run git as `stellaastro`, or know why you can get away with root.** The
+  services run as `stellaastro`; a file created by root that is not
+  group-writable is one the running app cannot rewrite, and `next-env.d.ts`,
+  `.gitignore` and `tsconfig.json` have each broken the dev server this way.
+  Two settings now absorb it: `core.sharedRepository=group` makes git create
+  group-writable files, and the setgid bit on every directory keeps the group
+  as `stellaastro` whoever writes. Neither helps for tools outside git, so
+  builds still run `sudo -u stellaastro`.
+- **Deploying the web app means building a NEW release directory** and pointing
+  `NEXT_DIST_DIR` at it in
+  `/etc/systemd/system/stella-web.service.d/hero-release.conf`. Building
+  `.next-prod` alone changes nothing that is served. Keep the live directory and
+  one rollback target; prune the rest, because each is ~56 MB and they had
+  reached 511 MB before anyone looked.
 - **Money is integer paise.** Never a float.
 - **Gold is never text and never a button fill.** Saffron gold is 2.31:1 on ivory
   — it fails harder than the gold it replaced. The contrast lint enforces it.
