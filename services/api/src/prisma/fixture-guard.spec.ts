@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FixtureGuard } from './fixture-guard';
 
-const makePrisma = (fixtureCount: number) => ({
-  lead: { count: vi.fn(async () => fixtureCount) },
+/**
+ * Both fixture-bearing tables. The guard checked only `leads` until the
+ * astrologer roster landed, and a guard that does not know about the table you
+ * just added reports "all clear" while the fixtures sit there.
+ */
+const makePrisma = (leads: number, astrologers = 0, users = 0) => ({
+  lead: { count: vi.fn(async () => leads) },
+  astrologer: { count: vi.fn(async () => astrologers) },
+  user: { count: vi.fn(async () => users) },
 });
 
 describe('FixtureGuard', () => {
@@ -59,6 +66,27 @@ describe('FixtureGuard', () => {
     delete process.env.APP_ENV;
     delete process.env.NODE_ENV;
     await new FixtureGuard(makePrisma(1) as never).onApplicationBootstrap();
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it('refuses when the fixtures are astrologers and the leads table is clean', async () => {
+    // The case the guard missed by construction until Phase 4: a table it did
+    // not know to check. A fake practitioner on a registered company's site is
+    // someone attempting to book a person who does not exist.
+    process.env.APP_ENV = 'production';
+    const prisma = makePrisma(0, 20);
+    await new FixtureGuard(prisma as never).onApplicationBootstrap();
+    expect(prisma.astrologer.count).toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it('refuses when the fixtures are synthetic CUSTOMERS', async () => {
+    // A customer is a User with no roles, so contaminated fixtures land in the
+    // users table — which this guard could not see until users got a marker.
+    process.env.APP_ENV = 'production';
+    const prisma = makePrisma(0, 0, 30);
+    await new FixtureGuard(prisma as never).onApplicationBootstrap();
+    expect(prisma.user.count).toHaveBeenCalled();
     expect(exit).toHaveBeenCalledWith(1);
   });
 });

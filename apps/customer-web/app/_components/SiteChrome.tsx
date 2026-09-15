@@ -1,3 +1,6 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
 import SiteNav from './SiteNav';
 
 /**
@@ -13,7 +16,29 @@ import SiteNav from './SiteNav';
  * company's live site are worse than a shorter menu.
  */
 
+/**
+ * Routes that render with no chrome at all.
+ *
+ * ONLY the sign-in page, and the exemption is narrow on purpose. The rule above
+ * — that the entity name and the no-professional-advice disclaimer are not
+ * optional decorations — is about pages a member of the public can reach and
+ * act on. /admin/login is noindex, is not linked from anywhere public, and
+ * sells nothing; it is a door, and a door does not need a legal footer.
+ *
+ * An exact match, not a prefix: /admin itself keeps its chrome, and a future
+ * /admin/login/something would have to opt in deliberately rather than inherit
+ * a bare layout by accident.
+ */
+const BARE_ROUTES = new Set(['/admin/login']);
+
+function useBare(): boolean {
+  const pathname = usePathname();
+  return pathname !== null && BARE_ROUTES.has(pathname);
+}
+
 export function SiteHeader() {
+  const bare = useBare();
+  if (bare) return null;
   return (
     <header className="top">
       <div className="topin">
@@ -32,6 +57,8 @@ export function SiteHeader() {
 }
 
 export function SiteFooter() {
+  const bare = useBare();
+  if (bare) return null;
   return (
     <footer>
       <div className="wrap">

@@ -73,6 +73,26 @@ const PAIRS = [
   ['--cta',       '--cream',      4.5, 'terracotta on lotus cream — 0.11 margin'],
   ['--ink',       '--cream',      7.0, 'body text on lotus cream, AAA'],
   ['--dark-muted','--dark-ground',4.5, 'legal and footnote text on dark, AA'],
+
+  /* Added with the band and masthead work, 2026-09-15. Each of these is a
+     pairing the site now actually renders, and none of them was checked
+     before — --surface-2 had been a token nothing measured. */
+  ['--ink-soft',  '--cream',      4.5, 'secondary text on lotus cream bands'],
+  ['--leaf',      '--cream',      4.5, 'masthead eyebrow on cream — 4.89:1, thin'],
+  ['--ink',       '--surface-2',  7.0, 'text on panels, AAA'],
+  ['--ink-soft',  '--surface-2',  4.5, 'secondary text on panels'],
+  ['--cta',       '--surface-2',  4.5, 'the sign-in button, on its panel'],
+];
+
+/* A pairing that must NOT be used, recorded because the design doc invites it.
+   DESIGN.md §1 says gold "becomes permissible for text and buttons" on dark.
+   That is true of --dark-ground (5.51:1) and FALSE one shade along:
+   --accent on --dark-panel is 4.43:1 and fails AA. The rule is not "gold is
+   fine on dark" — it is "gold is fine on THIS dark". The ban on gold as text
+   makes this unreachable today; this check exists so that if anyone ever
+   relaxes that ban, the panel case fails loudly rather than shipping. */
+const MUST_FAIL_AA = [
+  ['--accent', '--dark-panel', 'gold as text on --dark-panel'],
 ];
 
 const failures = [];
@@ -103,6 +123,23 @@ if (accent && surface) {
       `--accent is now ${ratio.toFixed(2)}:1 on --surface and would pass AA. ` +
       `The ornament-only rule in ADR-001 assumes it fails. Update the ADR ` +
       `deliberately or revert the colour.`,
+    );
+  }
+}
+
+/* Assert the recorded traps really are traps. If one starts passing, the
+   palette moved and the comment above it is now a lie — which is worse than
+   no comment, so fail and make someone update it deliberately. */
+for (const [fg, bg, what] of MUST_FAIL_AA) {
+  const a = hex(tokens[fg] ?? '');
+  const b = hex(tokens[bg] ?? '');
+  if (!a || !b) continue;
+  const ratio = contrast(a, b);
+  if (ratio >= 4.5) {
+    failures.push(
+      `${what} is now ${ratio.toFixed(2)}:1 and would pass AA. It was 4.43:1 ` +
+      `and is documented as unusable. Update DESIGN.md §1 and this list ` +
+      `together, rather than letting the note rot.`,
     );
   }
 }
@@ -190,6 +227,32 @@ for (const { files, re, what } of MUST_MATCH_SURFACE) {
       );
     }
   }
+}
+
+/* The watermark's gold is a literal inside an SVG, for the same reason
+   themeColor is: the file is an asset, not a stylesheet, so it cannot read a
+   custom property. Same treatment as HERO_GROUND — check it rather than trust
+   it, or the botanical ground keeps the old gold through the next palette
+   change and nobody notices, because 6% of the wrong colour looks fine. */
+const accentHex = (tokens['--accent'] ?? '').toUpperCase();
+const WATERMARK = join(ROOT, 'apps/customer-web/public/botanical.svg');
+try {
+  const svg = readFileSync(WATERMARK, 'utf8');
+  const m = /stroke="(#[0-9a-fA-F]{6})"/.exec(svg);
+  if (!m) {
+    failures.push(
+      `apps/customer-web/public/botanical.svg — no stroke colour found. The ` +
+      `watermark must carry --accent (${accentHex}) as its stroke.`,
+    );
+  } else if (m[1].toUpperCase() !== accentHex) {
+    failures.push(
+      `apps/customer-web/public/botanical.svg — stroke ${m[1]} should be ` +
+      `--accent (${accentHex}): the watermark would keep the old gold ` +
+      `through a palette change.`,
+    );
+  }
+} catch {
+  failures.push('apps/customer-web/public/botanical.svg is missing — the page ground would be flat.');
 }
 
 /* Hand-inlined rgba() triplets silently held the OLD ivory through a palette

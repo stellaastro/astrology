@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { OutboxService } from '../outbox/outbox.service';
 import { IdempotencyService } from '../idempotency/idempotency.service';
+import { RetentionService } from '../privacy/retention.service';
 
 /**
  * Recurring work.
@@ -31,6 +32,7 @@ export class SchedulerService {
   constructor(
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
+    private readonly retention: RetentionService,
   ) {}
 
   /**
@@ -76,6 +78,23 @@ export class SchedulerService {
       }
     } catch (err) {
       this.log.error('Parked check failed', err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  /**
+   * Data retention (ADR-041, task 3.7).
+   *
+   * Daily, and deliberately NOT hourly: this deletes people's records, so a
+   * mistake in a horizon should have a day to be noticed rather than an hour.
+   * The horizons live in RetentionService; the reasoning is in
+   * docs/policies/DATA_RETENTION.md.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_4AM, { name: 'retention.purge' })
+  async purgeExpiredData(): Promise<void> {
+    try {
+      await this.retention.purge();
+    } catch (err) {
+      this.log.error('Retention purge failed', err instanceof Error ? err.stack : String(err));
     }
   }
 

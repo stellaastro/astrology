@@ -6,9 +6,15 @@ import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { CoreModule } from './core/core.module';
 import { FixtureGuard } from './prisma/fixture-guard';
+import { MigrationGuard } from './prisma/migration-guard';
 import { HealthController } from './health/health.controller';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { LeadsModule } from './leads/leads.module';
+import { PrivacyModule } from './privacy/privacy.module';
+import { AstrologersModule } from './astrologers/astrologers.module';
+import { AvailabilityModule } from './availability/availability.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { ConsultationsModule } from './consultations/consultations.module';
 import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
@@ -45,6 +51,11 @@ import { AuthGuard } from './auth/auth.guard';
     PrismaModule,
     CoreModule,
     LeadsModule,
+    PrivacyModule,
+    AstrologersModule,
+    AvailabilityModule,
+    RealtimeModule,
+    ConsultationsModule,
     // Registers the outbox handler that sends waitlist confirmations.
     MailModule,
     // Sessions, password sign-in, and the guard below.
@@ -63,6 +74,10 @@ import { AuthGuard } from './auth/auth.guard';
     // Applies the limit to every route; individual routes tighten it with
     // @Throttle. Without this the decorator is decorative.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Before FixtureGuard deliberately: if the schema is behind the code,
+    // FixtureGuard's own query is one of the things that will fail, and
+    // "column does not exist" is a far worse message than "run migrate".
+    MigrationGuard,
     FixtureGuard,
     SchedulerService,
   ],

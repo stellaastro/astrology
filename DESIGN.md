@@ -85,9 +85,27 @@ rather than trusting anyone to remember.
 
 ### Dark surfaces
 
-Sections may invert to `--dark-ground`. On dark, gold **becomes** permissible for
-text and buttons — `#D99A16` on `#48251C` is 5.51:1. The rule is about gold on
-ivory, not gold in general.
+Sections may invert to `--dark-ground` — `#site` bands and the sign-in page both
+do. Text on umber is ivory (`--dark-text`, 12.75:1) or `--dark-soft` (9.34:1).
+
+**Two measured traps, both of which bite one shade away from something safe:**
+
+- **Terracotta dies on dark.** `--cta` on `--dark-ground` is **2.27:1**. The
+  normal button cannot survive a dark band. Where the sign-in page keeps its
+  terracotta button, it is because the button sits on an ivory *panel*
+  (5.84:1 on `--surface-2`), not on the umber — the panel is carrying the
+  contrast, so it is structural rather than decoration.
+- **"Gold is fine on dark" is only true of one dark.** `#D99A16` is 5.51:1 on
+  `--dark-ground` and **4.43:1 on `--dark-panel`, which fails AA.** An earlier
+  version of this section said gold "becomes permissible for text and buttons"
+  on dark, full stop, which would have failed silently on the panel shade.
+
+**In practice gold is still never text and never a fill**, on any surface. The
+contrast lint bans `color:`/`background: var(--accent)` everywhere and that gate
+is worth more than the flourish, so bands use gold only as gradients, borders,
+hairlines and SVG stroke — all of which the lint permits by design. The
+`MUST_FAIL_AA` list in `scripts/contrast-lint.mjs` holds the panel case, so if
+anyone ever relaxes the ban, that pairing fails loudly instead of shipping.
 
 ### Background treatment
 
@@ -104,6 +122,14 @@ texture, not as illustration. Two constraints:
 
 The zodiac wheel is the **single visual anchor** and appears once per page. Two
 ornaments of that weight compete and neither wins.
+
+**Built 2026-09-15** as `apps/customer-web/public/botanical.svg` — a 6 KB tiling
+SVG of lotus rosettes, generated so the petals are genuinely radially symmetric
+and the tile genuinely repeats. It is **fixed rather than scrolling**, so the
+ground stays still while content moves over it and reads as printed stock rather
+than as wallpaper. Held at **6%** on ivory and cream, 10% on umber, where gold
+needs more to register at all. The gold in that file is a literal, so
+`contrast-lint.mjs` checks it still equals `--accent`.
 
 ---
 

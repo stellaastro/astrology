@@ -83,6 +83,10 @@
   --maxw: 1180px;
   --tap:  44px;                       /* minimum touch target            */
   --radius: 2px;
+  /* A large surface can carry a larger curve than a 44px control without the
+     system losing its crispness. Used by the sign-in card and nothing smaller —
+     if a button ever takes this, the two radii stop reading as deliberate. */
+  --radius-lg: 12px;
 
   /* ── Motion ─────────────────────────────────────────────── */
   --ease: cubic-bezier(.2, .7, .3, 1);

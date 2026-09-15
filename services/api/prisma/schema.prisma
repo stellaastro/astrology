@@ -81,12 +81,58 @@ model Lead {
   /// without a column to look at. Production rows are always false.
   isDevFixture Boolean @default(false) @map("is_dev_fixture")
 
+  /// Which seed run created this row (ADR-036). Cleanup deletes by dataset, so
+  /// a reseed can never reach a row it did not create — "delete where
+  /// is_dev_fixture" would happily take someone else's fixtures with it.
+  fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
+
   createdAt DateTime @default(now()) @map("created_at")
+
+  /// DPDP access and erasure requests made by this person (ADR-040).
+  privacyRequests PrivacyRequest[]
 
   @@index([createdAt])
   @@index([referralCode])
   @@index([isDevFixture])
   @@map("leads")
+}
+
+/// A DPDP access or erasure request (ADR-040).
+///
+/// A lead has NO ACCOUNT, so the only way to authenticate one of these is to
+/// prove control of the address — the same thing double opt-in already proves.
+/// The emailed token is the proof; this row is its server-side half.
+model PrivacyRequest {
+  id String @id @db.Char(26) // ULID
+
+  /// SHA-256 of the emailed token, hex. Never the token itself — the same rule
+  /// as sessions: reading this table must not let anyone exercise a request.
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+
+  /// The subject. CASCADE is load-bearing: erasing the lead must also remove
+  /// the request that asked for it, or this table keeps a live pointer to a
+  /// person who has been deleted.
+  leadId String @map("lead_id") @db.Char(26)
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  /// 'access' or 'erasure'. A VarChar rather than a Prisma enum to match the
+  /// rest of this schema; the service validates it.
+  kind String @db.VarChar(16)
+
+  expiresAt   DateTime  @map("expires_at")
+  /// Set when exercised. Single use — a link that still works after it has been
+  /// used is a link that works for whoever later reads the mailbox.
+  completedAt DateTime? @map("completed_at")
+
+  /// Who asked, for the audit trail. Erased along with the row.
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([leadId])
+  @@index([expiresAt])
+  @@map("privacy_requests")
 }
 
 /// Append-only audit log (ADR: Phase 1 substrate).
@@ -206,12 +252,36 @@ model User {
   lockedUntil      DateTime? @map("locked_until")
   lastLoginAt      DateTime? @map("last_login_at")
 
+  /// Dev fixture marking (ADR-026, ADR-036).
+  ///
+  /// Users had no marker until dummy CUSTOMERS were seeded, and without one the
+  /// boot guard could not see them: a contaminated production users table would
+  /// have reported all clear. Customers are Users — a customer is simply an
+  /// account with no admin or astrologer role — so this is the column that makes
+  /// a synthetic customer detectable.
+  isDevFixture   Boolean @default(false) @map("is_dev_fixture")
+  fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   sessions Session[]
 
+  /// An astrologer's profile, when this account is one. Optional on both sides:
+  /// profiles are ADMIN-CREATED and exist before the practitioner has ever
+  /// signed in (ADR-043).
+  astrologer Astrologer?
+
+  /// Bookings this account made as a CUSTOMER. A customer is a User with no
+  /// roles (ADR-036); there is no separate table.
+  bookings Booking[]
+
+  /// What this account has agreed to, and which version of it (ADR-050).
+  policyAcceptances PolicyAcceptance[]
+
   @@index([disabledAt])
+  @@index([isDevFixture])
+  @@index([fixtureDataset])
   @@map("users")
 }
 
@@ -246,4 +316,493 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// An astrologer's public profile and commercial terms (ADR-043).
+///
+/// ADMIN-CREATED. There is no self-signup: at a roster of twelve or fewer, a
+/// KYC pipeline costs more than it protects, so a person with admin rights
+/// enters the profile and a human decides when it goes live.
+model Astrologer {
+  id String @id @db.Char(26) // ULID
+
+  /// Linked when the practitioner first signs in. NULL until then, which is the
+  /// normal state for a freshly created profile — the profile is the record,
+  /// the account is just how they reach it.
+  userId String? @unique @map("user_id") @db.Char(26)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Public URL segment. Stable once published: changing it breaks every link
+  /// anyone has shared.
+  slug String @unique @db.VarChar(80)
+
+  /// Devanagari is canonical for display — the brand wheel labels every sign in
+  /// it and none in Western glyphs — with a Latin transliteration alongside so
+  /// the name is addressable in both scripts.
+  nameHi String @map("name_hi") @db.VarChar(120)
+  nameEn String @map("name_en") @db.VarChar(120)
+
+  /// Also carries the company office for the founding directors — "Executive
+  /// Director", "Director". A separate column for one label at a roster of
+  /// three would be over-modelling; revisit if it ever needs to be filtered on.
+  headline String? @db.VarChar(160)
+  bio      String? @db.Text
+
+  /// An integer, not a string. "20+ years" is a rendering decision, not data,
+  /// and a string here cannot be sorted or validated.
+  ///
+  /// NULLABLE, and that is the point (ADR-044). The three founding directors
+  /// are real, named and already public, but their years of practice have not
+  /// been supplied (owner action O3). A required column here meant the real
+  /// people could not be entered at all while twenty invented ones could —
+  /// the model demanding data nobody has is the model being wrong.
+  experienceYears Int? @map("experience_years")
+
+  /// JSON arrays. MySQL has no array type, and join tables for languages and
+  /// specialisations at a roster of twelve would cost more than they explain.
+  /// Revisit when discovery and filtering land — both deferred past first
+  /// revenue, which is exactly when a join table starts paying for itself.
+  languages       Json
+  specialisations Json
+
+  /// INTEGER PAISE. Never rupees, never a float (ADR-019 / common/money.ts).
+  ///
+  /// This is the CURRENT rate and nothing else. A booking freezes its own price
+  /// snapshot at creation and must never read back through this column — a rate
+  /// change would otherwise silently rewrite the price of every past booking
+  /// (§79, Phase 6).
+  /// NULLABLE for the same reason as experienceYears. A profile with no rate is
+  /// PUBLISHABLE but not BOOKABLE — it can be named on the site as a founding
+  /// astrologer while the price is still an owner decision. Phase 6 enforces
+  /// the second half: no rate, no booking.
+  sessionRatePaise Int? @map("session_rate_paise")
+  sessionMinutes   Int  @default(30) @map("session_minutes")
+
+  /// Minutes left free AFTER each session (task 5.2).
+  ///
+  /// Not cosmetic: Phase 6's overrun policy needs somewhere for a consultation
+  /// that runs long to go. Without a buffer the only options are cutting
+  /// someone off mid-sentence or silently eating into the next booking, and
+  /// the second is how a scheduled-appointment product turns into a queue.
+  bufferMinutes Int @default(0) @map("buffer_minutes")
+
+  /// An R2 object key, never a URL. The KYC and media buckets are private and
+  /// links are signed at read time with a short TTL (ADR-042), so storing a URL
+  /// would store something that stops working.
+  photoKey String? @map("photo_key") @db.VarChar(255)
+
+  /// NOTHING IS PUBLIC UNTIL A HUMAN PUBLISHES IT. Public pages are real or
+  /// empty — never an invented practitioner (§13, ADR-036). A synthetic row can
+  /// be published in development and still cannot appear in production, because
+  /// the fixture guard refuses to serve fixtures under a production profile.
+  publishedAt DateTime? @map("published_at")
+
+  /// Retired rather than deleted: past bookings must keep pointing at a real
+  /// row, and financial history is immutable (§79).
+  retiredAt DateTime? @map("retired_at")
+
+  /// Dev fixture marking (ADR-026) and the dataset that created it (ADR-036).
+  isDevFixture   Boolean @default(false) @map("is_dev_fixture")
+  fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
+
+  availabilityRules  AvailabilityRule[]
+  availabilityBlocks AvailabilityBlock[]
+  bookings           Booking[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([publishedAt])
+  @@index([retiredAt])
+  @@index([isDevFixture])
+  @@index([fixtureDataset])
+  @@map("astrologers")
+}
+
+/// A recurring weekly window an astrologer works (task 5.1).
+///
+/// STORED IN Asia/Kolkata WALL-CLOCK, deliberately, per task 6.5. "I work
+/// Tuesdays 09:00–13:00" is a statement about local time that stays true
+/// whatever happens elsewhere; storing it as a UTC instant would make it a
+/// different claim every time some other country changed its clocks.
+///
+/// India has no DST and has not since 1945, so IST is a fixed +05:30 and the
+/// conversion to UTC is exact arithmetic rather than a lookup. THAT IS AN
+/// ASSUMPTION ABOUT INDIA, not about time: an astrologer in a DST-observing
+/// country would need a real timezone library and a zone id on this row.
+model AvailabilityRule {
+  id String @id @db.Char(26) // ULID
+
+  astrologerId String     @map("astrologer_id") @db.Char(26)
+  astrologer   Astrologer @relation(fields: [astrologerId], references: [id], onDelete: Cascade)
+
+  /// 0 = Sunday … 6 = Saturday, matching JavaScript's getDay().
+  weekday Int @db.TinyInt
+
+  /// Minutes from midnight IST. 540 = 09:00, 780 = 13:00.
+  ///
+  /// Integers rather than a TIME column: they compare and sort without any
+  /// question of what zone the value is in, and a TIME column next to a
+  /// DATETIME invites reading one as if it carried the other's zone.
+  startMinute Int @map("start_minute")
+  endMinute   Int @map("end_minute")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// MySQL HAS NO EXCLUSION CONSTRAINTS, so overlapping windows cannot be
+  /// forbidden by the schema — the service checks. Same class of gap as the
+  /// partial-unique-index problem in ADR-029: the database will happily store
+  /// something the domain forbids, so the check has to live somewhere and be
+  /// tested.
+  @@index([astrologerId, weekday])
+  @@map("availability_rules")
+}
+
+/// A one-off period an astrologer is NOT available (task 5.1).
+///
+/// UTC INSTANTS, unlike the weekly rule above, and the difference matters: a
+/// block is a real interval in the world ("I am at a wedding from Friday
+/// evening to Sunday night"), not a statement about local clock time.
+model AvailabilityBlock {
+  id String @id @db.Char(26) // ULID
+
+  astrologerId String     @map("astrologer_id") @db.Char(26)
+  astrologer   Astrologer @relation(fields: [astrologerId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime @map("starts_at")
+  endsAt   DateTime @map("ends_at")
+
+  /// Shown to nobody but the astrologer and an admin. A customer sees a slot
+  /// that is not offered, never the reason.
+  reason String? @db.VarChar(160)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([astrologerId, startsAt])
+  @@map("availability_blocks")
+}
+
+/// A booked consultation slot (ADR-046).
+///
+/// THE SLOT IS HELD BY THIS ROW, not by Redis (ADR-029). A hold must outlive
+/// the entire Razorpay flow, and a UPI collect request pends for minutes —
+/// long enough that any sensible cache TTL would expire mid-payment and sell
+/// the slot twice. Redis may cache this for the UI; it may never own it.
+model Booking {
+  id String @id @db.Char(26) // ULID
+
+  astrologerId String     @map("astrologer_id") @db.Char(26)
+  /// onUpdate: NoAction is REQUIRED, not a preference. MySQL refuses a foreign
+  /// key with CASCADE on a column that feeds a STORED GENERATED column, and
+  /// astrologer_id feeds slot_key — the CREATE fails with error 1215. Costs
+  /// nothing: ULIDs are never updated.
+  astrologer   Astrologer @relation(fields: [astrologerId], references: [id], onUpdate: NoAction)
+
+  customerId String @map("customer_id") @db.Char(26)
+  customer   User   @relation(fields: [customerId], references: [id])
+
+  /// UTC instants (task 6.5). The astrologer's availability RULE is IST
+  /// wall-clock; the booked slot is a moment in the world.
+  slotStart DateTime @map("slot_start")
+  slotEnd   DateTime @map("slot_end")
+
+  /// held · confirmed · cancelled · expired · completed · no_show
+  status String @db.VarChar(16)
+
+  /// THE SLOT-OCCUPANCY KEY — a STORED GENERATED COLUMN, created by raw SQL in
+  /// the migration because Prisma cannot express one.
+  ///
+  /// NULL when the row does not occupy its slot, otherwise
+  /// `astrologer_id + '#' + slot_start`. MySQL permits unlimited NULLs in a
+  /// unique index, so a unique index on this yields exactly the filtered
+  /// uniqueness MySQL's lack of partial indexes otherwise denies (ADR-029).
+  ///
+  /// A plain UNIQUE(astrologer_id, slot_start) — the PostgreSQL habit — would
+  /// block that slot FOR EVER after one cancellation, and would surface as
+  /// astrologers asking why their afternoons vanished.
+  ///
+  /// NEVER WRITTEN BY THE APPLICATION. MySQL computes it.
+  slotKey String? @map("slot_key") @db.VarChar(64)
+
+  /// PRICE SNAPSHOT, frozen at creation and never recomputed (§79). Reading
+  /// the price back through astrologers.session_rate_paise would rewrite the
+  /// price of every past booking the moment someone edits a rate.
+  pricePaise     Int @map("price_paise")
+  sessionMinutes Int @map("session_minutes")
+
+  /// TAX COLUMNS, present from THIS migration deliberately (task 6.4).
+  ///
+  /// Under pay-at-booking the invoice is issued at booking, and adding a tax
+  /// split to already-paid rows is the uncorrectable retrofit the plan exists
+  /// to avoid. They are NULLABLE only because the rate is unanswered (owner
+  /// action O6: is Stella principal or agent for GST?). Phase 7 computes them
+  /// and a booking cannot be CONFIRMED without them — an unpaid held row may
+  /// carry nulls; a paid one may not.
+  taxableValuePaise Int?    @map("taxable_value_paise")
+  /// Basis points: 1800 = 18%. An integer, because a percentage as a float is
+  /// the same mistake as rupees as a float.
+  taxRateBp         Int?    @map("tax_rate_bp")
+  taxAmountPaise    Int?    @map("tax_amount_paise")
+  sacCode           String? @map("sac_code") @db.VarChar(16)
+  placeOfSupply     String? @map("place_of_supply") @db.VarChar(2)
+
+  /// When an unconfirmed hold lapses. The generated column cannot reference
+  /// NOW(), so expiry is MATERIALISED by the reaper flipping status — which is
+  /// what makes the hold durable rather than a clock the database consults.
+  holdExpiresAt DateTime? @map("hold_expires_at")
+
+  confirmedAt DateTime? @map("confirmed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  /// One key, one booking (task 6.3). A double-click creating two Razorpay
+  /// orders for one slot is the most likely launch incident: the unique index
+  /// on slot_key protects the SLOT, this protects the CUSTOMER'S CARD.
+  idempotencyKey String? @unique @map("idempotency_key") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  consultation Consultation?
+
+  @@index([astrologerId, slotStart])
+  @@index([customerId])
+  @@index([status, holdExpiresAt])
+  @@map("bookings")
+}
+
+/// The session itself — one per booking (ADR-048).
+model Consultation {
+  id String @id @db.Char(26) // ULID
+
+  bookingId String  @unique @map("booking_id") @db.Char(26)
+  booking   Booking @relation(fields: [bookingId], references: [id], onUpdate: NoAction)
+
+  /// 'voice' or 'chat' (ADR-051). Fixed when the booking is made, because the
+  /// customer chose and paid for one or the other.
+  modality String @default("voice") @db.VarChar(8)
+
+  /// The 100ms room, created per consultation. Never a shared room (ADR-047).
+  /// Null for a chat consultation — there is no call to join.
+  roomId String? @map("room_id") @db.VarChar(64)
+
+  startedAt DateTime? @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  /// Join/leave is the only honest no-show signal (task 6.8).
+  astrologerJoinedAt DateTime? @map("astrologer_joined_at")
+  customerJoinedAt   DateTime? @map("customer_joined_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  consents  RecordingConsent[]
+  recording Recording?
+  messages  ChatMessage[]
+
+  /// One review queue for both modalities (ADR-051).
+  assessment ConsultationAssessment?
+
+  @@map("consultations")
+}
+
+/// One party's consent to being recorded (ADR-048).
+///
+/// A ROW PER PARTY, not a boolean on the consultation. Recording needs BOTH,
+/// and a single flag cannot say who agreed to what — which is the only thing
+/// that matters if it is ever questioned.
+///
+/// Stored as an artifact with a policy version and a timestamp, the same shape
+/// as lead consent: "they agreed" without a record of what they agreed to is
+/// not consent.
+model RecordingConsent {
+  id String @id @db.Char(26)
+
+  consultationId String       @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// 'astrologer' or 'customer'.
+  party String @db.VarChar(16)
+
+  /// The account that answered. Kept so a later question has an answer.
+  userId String @map("user_id") @db.Char(26)
+
+  /// TRUE is consent, FALSE is refusal, and a refusal is recorded rather than
+  /// treated as an absent answer. "They never replied" and "they said no" are
+  /// different facts and only one of them is a decision.
+  granted Boolean
+
+  /// What they were shown. Without this, consent cannot be demonstrated.
+  policyVersion String   @map("policy_version") @db.VarChar(32)
+  decidedAt     DateTime @map("decided_at")
+
+  /// Set when withdrawn. Withdrawal deletes the recording; this row stays as
+  /// the record that it was withdrawn and when.
+  withdrawnAt DateTime? @map("withdrawn_at")
+
+  @@unique([consultationId, party])
+  @@index([userId])
+  @@map("recording_consents")
+}
+
+/// A stored audio recording (ADR-048).
+model Recording {
+  id String @id @db.Char(26)
+
+  consultationId String       @unique @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// The R2 object key in `stella-recordings`. NEVER a URL: the bucket is
+  /// private and links are signed at read time with a short TTL (ADR-042).
+  objectKey String? @map("object_key") @db.VarChar(255)
+
+  durationSeconds Int? @map("duration_seconds")
+  sizeBytes       Int? @map("size_bytes")
+
+  /// pending · stored · failed · deleted
+  status String @db.VarChar(16)
+
+  /// When R2's own lifecycle rule will remove the object. Recorded so the
+  /// database agrees with the bucket rather than guessing at it.
+  expiresAt DateTime? @map("expires_at")
+
+  /// Set when removed before expiry — a withdrawn consent or a DPDP erasure.
+  deletedAt     DateTime? @map("deleted_at")
+  deletedReason String?   @map("deleted_reason") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, expiresAt])
+  @@map("recordings")
+}
+
+/// A machine assessment of a recording, and its human review (ADR-048).
+///
+/// THE WHOLE POINT OF THIS TABLE IS THE REVIEW GATE. Automated analysis over
+/// Hindi and regional languages will produce false positives, and telling an
+/// astrologer that software judged them abusive is defamatory when it is wrong.
+/// So a machine result is a DRAFT until a named person has listened.
+model ConsultationAssessment {
+  id String @id @db.Char(26)
+
+  /// THE SUBJECT IS THE CONSULTATION, not the artifact.
+  ///
+  /// Renamed from RecordingAssessment when chat landed: a chat consultation has
+  /// a transcript rather than a recording, and it needs exactly the same review
+  /// gate. Keying the queue to `Recording` would have meant a second, parallel
+  /// pipeline for chat — and a second place for the "a machine result is a
+  /// draft" rule to be forgotten.
+  consultationId String       @unique @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// pending · machine_done · under_review · published · dismissed
+  ///
+  /// Only `published` is visible to the astrologer. Nothing reaches them
+  /// straight from the machine.
+  status String @db.VarChar(16)
+
+  /// What the machine thought. Advisory, never a finding.
+  abuseFlagged    Boolean @default(false) @map("abuse_flagged")
+  /// 0–100. Kept as an integer; a confidence as a float invites false
+  /// precision in a number that is already a guess.
+  abuseConfidence Int?    @map("abuse_confidence")
+  machineNotes    String? @map("machine_notes") @db.Text
+
+  /// The reviewer's decision. Set only by a human.
+  ///
+  /// The reviewer MAY NOT be the astrologer being assessed — enforced in the
+  /// service, because at roster 3 they are otherwise the only available
+  /// reviewer (the four-eyes gap in task 6.9 / owner action O5).
+  reviewerId      String?   @map("reviewer_id") @db.Char(26)
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewerVerdict String?   @map("reviewer_verdict") @db.VarChar(16)
+  reviewerNotes   String?   @map("reviewer_notes") @db.Text
+
+  /// Published grade, 1–5. Null until a human publishes it.
+  grade Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("consultation_assessments")
+}
+
+/// One message in a chat consultation (ADR-051).
+///
+/// The transcript IS the consultation record, in the way an audio file is for a
+/// voice call — so it carries the same retention, the same review path and the
+/// same erasure obligations. A chat consultation cannot happen without this
+/// being stored, which is why clause 10 of the Terms says so plainly rather
+/// than asking for a consent that could not be declined.
+model ChatMessage {
+  id String @id @db.Char(26) // ULID, so ordering is the insertion order
+
+  consultationId String       @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// 'astrologer' or 'customer'. Never 'system' or 'bot': the Terms state that
+  /// a customer is writing to a named human, and a machine-authored message in
+  /// this table would make that false.
+  sender String @db.VarChar(16)
+
+  /// The account that sent it, so authorship survives a display-name change.
+  senderUserId String @map("sender_user_id") @db.Char(26)
+
+  body String @db.Text
+
+  sentAt DateTime @map("sent_at")
+
+  /// Cleared on erasure or when retention expires. The ROW stays so the
+  /// transcript's shape — who sent how many, and when — remains answerable
+  /// without the content.
+  redactedAt DateTime? @map("redacted_at")
+
+  @@index([consultationId, sentAt])
+  @@map("chat_messages")
+}
+
+/// A recorded acceptance of one policy, at one version (ADR-050).
+///
+/// Owner decision, 2026-09-15: the terms are shown as an ITEMISED LIST before
+/// an account is created, and recording is one of the listed points.
+///
+/// A ROW PER POLICY, not a single "accepted the terms" flag. DPDP consent must
+/// be specific, and one boolean covering terms, privacy and being recorded
+/// cannot show which of them a person actually agreed to. It also means a
+/// policy can be revised without re-asking for the others.
+///
+/// The VERSION is the point. "They accepted" is worthless a year later if
+/// nobody can say what the text said; this row plus the archived text is the
+/// whole of the evidence.
+model PolicyAcceptance {
+  id String @id @db.Char(26) // ULID
+
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 'terms' · 'privacy' · 'recording'
+  policy String @db.VarChar(32)
+
+  /// The exact version shown. Never a date, never "latest".
+  version String @db.VarChar(32)
+
+  /// FALSE is a refusal and is stored. Someone who declined recording is not
+  /// the same as someone who was never asked, and only one of them is a
+  /// decision that can be relied on.
+  accepted Boolean
+
+  acceptedAt DateTime @map("accepted_at")
+
+  /// Evidence of the circumstances, same as the waitlist consent record.
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  /// Set when the person later changes their mind.
+  withdrawnAt DateTime? @map("withdrawn_at")
+
+  @@unique([userId, policy, version])
+  @@index([userId, policy])
+  @@map("policy_acceptances")
 }

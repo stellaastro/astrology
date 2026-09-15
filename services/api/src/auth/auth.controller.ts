@@ -9,6 +9,24 @@ import { SESSION_COOKIE, SessionService } from './session.service';
 
 /** Short-lived, single-flight cookies for the OAuth round trip. */
 const OAUTH_STATE_COOKIE = 'stella_oauth_state';
+const OAUTH_NEXT_COOKIE = 'stella_oauth_next';
+
+/**
+ * Where Google sign-in may return you.
+ *
+ * A KEY INTO THIS MAP, never a URL. `?next=admin` is looked up here and an
+ * unknown key falls back to '/'. The caller's string is therefore never used
+ * as a redirect target, which is what makes an open redirect impossible rather
+ * than merely filtered — there is no input that reaches res.redirect().
+ *
+ * Filtering a supplied URL is the version of this that keeps getting broken by
+ * a new parser trick ('//evil.com', '/\\evil.com', backslashes, userinfo @).
+ * A lookup table has no parser.
+ */
+const RETURN_TO: Record<string, string> = {
+  admin: '/admin',
+  home: '/',
+};
 const OAUTH_VERIFIER_COOKIE = 'stella_oauth_verifier';
 import { Public, type AuthedRequest } from './auth.guard';
 import { GoogleService } from './google.service';
@@ -84,7 +102,10 @@ export class AuthController {
   @Public()
   @Get('google')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  googleStart(@Res({ passthrough: true }) res: Response) {
+  googleStart(
+    @Res({ passthrough: true }) res: Response,
+    @Query('next') next?: string,
+  ) {
     const { url, state, verifier } = this.google.start();
     const opts = {
       httpOnly: true,
@@ -95,6 +116,11 @@ export class AuthController {
     };
     res.cookie(OAUTH_STATE_COOKIE, state, opts);
     res.cookie(OAUTH_VERIFIER_COOKIE, verifier, opts);
+    // Only ever a known key, and only when it IS one — so nothing an attacker
+    // supplies is stored, let alone redirected to.
+    if (next && Object.prototype.hasOwnProperty.call(RETURN_TO, next)) {
+      res.cookie(OAUTH_NEXT_COOKIE, next, opts);
+    }
     res.redirect(302, url);
   }
 
@@ -120,8 +146,17 @@ export class AuthController {
     const expectedState = cookies[OAUTH_STATE_COOKIE];
     const verifier = cookies[OAUTH_VERIFIER_COOKIE];
 
+    const nextKey = cookies[OAUTH_NEXT_COOKIE];
+
     res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
     res.clearCookie(OAUTH_VERIFIER_COOKIE, { path: '/' });
+    res.clearCookie(OAUTH_NEXT_COOKIE, { path: '/' });
+
+    // Resolved through the table, so `destination` is one of two literals.
+    const destination =
+      nextKey && Object.prototype.hasOwnProperty.call(RETURN_TO, nextKey)
+        ? (RETURN_TO[nextKey] as string)
+        : '/';
 
     // The user pressed Cancel, or Google refused. Not an error to shout about.
     if (error) return res.redirect(302, '/?signin=cancelled');
@@ -148,7 +183,10 @@ export class AuthController {
     });
 
     // Back to the site, not to a JSON body — a browser is following this.
-    return res.redirect(302, '/?signin=ok');
+    // Straight to /admin when that is where sign-in began: landing an admin on
+    // the marketing page and making them retype the URL is a dead end, and the
+    // guard still decides whether they may actually see it.
+    return res.redirect(302, destination === '/' ? '/?signin=ok' : destination);
   }
 
   /** Who am I. Used by the admin UI to decide what to render. */

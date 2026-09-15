@@ -58,18 +58,18 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 | CTA | Terracotta `#A94424` on ivory `#FFF8E8` (5.61:1). On lotus cream it is **4.61:1** — AA by 0.11, and the lint guards that pair |
 | Type | **Serif display, sans body** (ADR-035): Cormorant Garamond (Latin headings) · Tiro Devanagari Hindi (Devanagari headings) · **Mukta** (all body and UI, covers both scripts). Inter still rejected — no Devanagari coverage |
 | Dev data | **Fully synthetic roster** in dev and staging — astrologers, customers, bookings, KYC (ADR-036). Production public pages are **real or empty**, never invented practitioners |
-| Auth | **Google sign-in for customers** (ADR-037) — phone OTP dropped, Firebase dropped with it. **Admin is one account, `admin@stellaastro.com`, password only** (ADR-038) — owner decision, supersedes ADR-018's MFA requirement; revisit before Phase 7 |
+| Auth | **Google sign-in for customers** (ADR-037) — phone OTP dropped, Firebase dropped with it. **Two admin identities** (ADR-038): `guruji@stellaastro.com` via Google, which carries Google's own 2FA and is the **preferred** route; `admin@stellaastro.com` password-only as **break-glass**. ADR-018's MFA requirement is still superseded, not met — the single-factor path stays open. Revisit before Phase 7. **Grant roles with `grant-role.ts`, never by hand-written SQL** — the CLI writes the audit row |
 | Sessions | **Server-side rows**, not signed tokens (ADR-039). Revocation must be a lookup the server can change. The guard denies by default — a route is public only if it says `@Public()` |
 | Backend | NestJS + TypeScript. Not FastAPI, not Pydantic |
 | Web | Next.js (customer + admin). Admin is a role-guarded route group, not a separate app |
 | Mobile | **Web-only for V1.** Flutter is deferred, not cancelled (ADR-022 supersedes ADR-007) |
 | Payments | **Razorpay per-booking, paid at booking. No wallet, no ledger in V1** (ADR-023 supersedes ADR-006) |
 | Billing | **Slot-based, not per-minute.** A booked 30-minute slot bills for the slot (ADR-024) |
-| Modality | **Scheduled appointments.** On-demand sits behind a ≥3-on-duty coverage gate (ADR-021) |
+| Modality | **Scheduled appointments, voice AND chat** (ADR-051, owner decision 2026-09-15). Chat is a **named human astrologer** in a chat-style UI — never a bot; `ChatMessage.sender` admits only `astrologer`/`customer`. Charged **per session like voice**, reusing the booking and slot model: per-message bundles would be the wallet ADR-023 removed, per-minute the metering ADR-024 removed. A chat transcript carries the **same retention, review and erasure** obligations as an audio recording. On-demand still sits behind a ≥3-on-duty coverage gate (ADR-021) |
 | Astrology | ProKerala via `AstrologyProvider` interface. Internal engine is a later swap |
-| Realtime | 100ms via `RealtimeProvider`. Not Agora. **Web SDK — mobile-browser WebRTC is untested and spiked in Phase 1** |
-| Storage | Cloudflare R2, S3-compatible, private buckets + signed URLs only |
-| Recording | Off in V1; seam retained |
+| Realtime | **100ms via `RealtimeProvider`** (ADR-047). Not Agora. **A room per consultation, never a shared one** — one room puts two concurrent consultations in the same call. Tokens minted server-side per request; the app secret never reaches a browser. Credentials are `HMS_*` in env, not `100MS_*`: a variable name cannot begin with a digit. **Mobile-browser WebRTC is still untested — task 1.5 needs real handsets on Indian 4G and the whole web-only bet rests on it** |
+| Storage | Cloudflare R2, S3-compatible, private buckets + signed URLs only. **One bucket per job, isolated at the provider, never by prefix** (ADR-042): `stella-kyc` (real KYC, nothing else) · `stella-kyc-dev` (synthetic, every file marked SAMPLE/NOT VALID) · `stella-backups` (dumps, binlogs, encrypted secrets). Two prefixes in one bucket share a blast radius; buckets do not. **Do not add a bucket without adding it to `docs/architecture/R2_BUCKETS.md` first, with a stated purpose** |
+| Recording | **Reversed by the owner 2026-09-15 (ADR-048): audio consultations ARE recorded**, kept 30 days in `stella-recordings` (R2-enforced expiry), screened and assessed. **Blocked on two owner decisions before anything records:** the consent wording (a recording without consent is a liability, not an asset — DPDP), and who reviews a flagged call, since at roster 3 the astrologer assessed is also the only available reviewer. **A machine output is a flag for a human, never a finding delivered to the astrologer** |
 | Locale | Auto-detect, Hindi default in India. **Legal pages stay English** — machine-translated disclosure text is worse than English |
 | Scale | **~12–15 concurrent consultations.** Launch roster is 3, soft-launch gate is 8–12. The old ~50 figure was sized to a roster that does not exist (ADR-008 corrected) |
 
@@ -86,13 +86,19 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 - **Fake data, real everything else** (ADR-036). Dev and staging run on a fully synthetic roster — that is intended. What must stay real in every environment: the database, authorization, constraints, the state machine, the arithmetic and the API contract. **A screen driven by a fixture is never evidence that the integration works.** Sandbox webhooks get the same signature verification as live ones. Provider failure surfaces as an error or a pending state — never as a fake success.
 - **Never send an OTP, SMS or email to an invented number or address.** Invented numbers belong to real people. Use owned test accounts, provider test destinations or a local sink. The directors' real mobile numbers must never become test recipients.
 - No invented user counts, ratings or testimonials on the landing page (§13).
+- **Personal data never enters the audit log.** It is append-only, so anything
+  written there can never be erased — which would make DPDP erasure impossible
+  and "we deleted your data" false. Audit the actor, the action and the target's
+  ULID; never the email, phone or a hash of either (ADR-040). `leads.service`
+  and `privacy.service` both have tests that fail if it comes back.
 - Migrations for every schema change. Never alter schema silently.
 - Feature work goes on `feature/*` branches, never straight to `main` (§57).
 - Financial, security, KYC and astrology-engine code needs review before landing (§59).
 
 ## Phase
 
-**Phase 2 — public entry. Substantially complete; Phase 3 is next.** Build order:
+**Phase 5 — availability. 5.1 and 5.2 done; 5.3 waits for Phase 6.**
+Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -105,16 +111,79 @@ endpoint, double opt-in with a real confirmation email, `/confirm`, navigation
 with a mobile sticky bar, and the accessibility pass. The site is live and the
 waitlist works end to end.
 
+**Phase 3 in full:** server-side sessions and a deny-by-default guard (ADR-039),
+Google sign-in (ADR-037), two admin identities (ADR-038), the audited admin lead
+read and CSV export, **DPDP access and erasure** (ADR-040) and **enforced data
+retention** (ADR-041). 3.1 and 3.4 (Firebase OTP and its rate limiting) are
+**moot, not skipped** — phone OTP was dropped with Firebase in ADR-037.
+
+**Phase 4 so far (ADR-043):** the `Astrologer` model, admin create/update/
+publish endpoints, a public roster that is real-or-empty, and the 20-strong
+synthetic roster (task 1.9 as widened). Profiles are **admin-created and draft
+by default** — publishing is a separate, audited decision.
+
+**4.2 and 4.3 done (ADR-044).** The three directors are real rows and the
+landing page reads them from the database. `/astrologer` is the practitioner's
+own surface; an admin links a profile to a signed-in account, which grants the
+`astrologer` role.
+
+**4.2's three named deliverables are NOT built and that is deliberate** — the
+availability editor is Phase 5, upcoming bookings Phase 6, the join link Phase
+8. None of those models exists yet, and the page says so rather than showing
+controls that do nothing.
+
+**Still open in Phase 4:**
+
+- **4.4** recruiting. Not engineering; owner action per O5.
+- **O3 still blocks the detail.** The directors are named and published, but
+  their experience, credentials, specialisations, photographs and per-session
+  price are absent — deliberately null, not zero. Until the price exists they
+  are **publishable but not bookable**, which is a real state the model now
+  carries. Add them through `/admin/astrologers`.
+
+**Availability (ADR-045):** weekly rules are **IST wall-clock**, blocks are
+**UTC instants**, and the difference is load-bearing. The inter-slot buffer
+widens the stride, never the session — billing is per slot, so a buffer that
+lengthened the session would overcharge. Overlapping windows are refused in the
+service because MySQL has no exclusion constraints.
+
+**The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
+price snapshot; never read a past booking's price back through
+`astrologers.session_rate_paise` (§79).
+
 **Still open in Phase 2:**
 
-- **2.8 legal pages — PARKED by the owner.** This is the Razorpay unblocker, and
-  it needs CIN (`U96906MP2026PTC085281`), GSTIN, the registered office, a
-  grievance officer, and the O4 refund policy. Do not write any of it from
-  invention.
+- **2.8 legal pages — customer Terms SUPPLIED 2026-09-15**, stored at
+  `docs/legal/customer-terms-v1.md`. **Still not publishable.** The placeholders
+  are unfilled (effective date, grievance officer, entity name, registered
+  address, grievance email) and the IT Rules require a named grievance officer.
+  **Three clauses describe a product this codebase does not build** — §7/§9
+  per-minute billing (ADR-024 is slot-based), §8 a prepaid wallet (ADR-023 has
+  none), §3 mobile/OTP registration (ADR-037 is Google sign-in). A terms page is
+  a promise to a customer; describing billing that does not happen is a
+  misdescription. See `docs/legal/README.md`. Still needs GSTIN and the O4
+  refund policy.
 - 2.14 referral codes · 2.15 a real transactional email provider · 2.16 signup
   counters. All P2.
 
-**Two operational facts that bite:**
+**Two open decisions recorded elsewhere, repeated here because they are easy to
+miss:**
+
+1. **How long confirmed leads are kept is unanswered** — the retention mechanism
+   ships switched off for them, deliberately, because deleting someone who asked
+   to hear when bookings open would silently break the waitlist's only promise
+   (ADR-041). Owner decision; `RETENTION_CONFIRMED_LEAD_DAYS` turns it on.
+2. **The audit log is documented as append-only but nothing enforces it** — no
+   triggers, no grant restrictions. Code never updates or deletes it, so the
+   property holds by convention only.
+
+**The review server (:8434) now has its own API and database.** It runs the
+synthetic roster against `stellaastro_dev` via `stella-api-dev` on port 4001.
+Until 2026-09-15 it proxied to the production API, so it showed production data
+and **any form submitted there wrote to production**. See
+`docs/REVIEW_SERVER.md`.
+
+**Three operational facts that bite:**
 
 1. **Deploying the web app means building a NEW release directory** and pointing
    `NEXT_DIST_DIR` at it in the `stella-web` systemd drop-in. Building
@@ -123,6 +192,12 @@ waitlist works end to end.
    `/home/stellaastro/secrets/api.production.env`**, not the repo `.env` — which
    is the development default and points at `stellaastro_dev`. See
    `infrastructure/api-production/README.md`.
+
+3. **MIGRATE BEFORE YOU RESTART.** Restarting the API with a build whose schema
+   is ahead of the database took production down for two minutes on 2026-09-15:
+   Prisma threw P2022 on a missing column and the service crash-looped behind a
+   502. `MigrationGuard` now refuses to boot and names the pending migrations,
+   but the order is still migrate → build → restart.
 
 Free tools (Kundli, horoscope, panchang) are **deferred past first revenue** —
 they are acquisition infrastructure for a scale that does not exist at roster 3.

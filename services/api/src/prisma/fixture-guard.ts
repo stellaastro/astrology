@@ -28,14 +28,35 @@ export class FixtureGuard implements OnApplicationBootstrap {
     const env = process.env.APP_ENV ?? process.env.NODE_ENV ?? 'unknown';
     if (env === 'development' || env === 'test') return;
 
-    const count = await this.prisma.lead.count({ where: { isDevFixture: true } });
-    if (count === 0) return;
+    /*
+     * Every table that can carry fixtures, checked in one pass.
+     *
+     * A LIST rather than a hardcoded query, because the failure mode here is
+     * silence: this guard checked only `leads` until astrologers landed, and a
+     * guard that does not know about the table you just added reports "all
+     * clear" while the fixtures sit there. Adding a fixture-bearing table
+     * without adding it here is the mistake this shape is meant to make hard.
+     */
+    const counts = await Promise.all([
+      this.prisma.lead.count({ where: { isDevFixture: true } })
+        .then((n) => ['leads', n] as const),
+      this.prisma.astrologer.count({ where: { isDevFixture: true } })
+        .then((n) => ['astrologers', n] as const),
+      this.prisma.user.count({ where: { isDevFixture: true } })
+        .then((n) => ['users', n] as const),
+    ]);
 
+    const contaminated = counts.filter(([, n]) => n > 0);
+    if (contaminated.length === 0) return;
+
+    const detail = contaminated.map(([t, n]) => `${n} in ${t}`).join(', ');
     this.log.error(
-      `REFUSING TO SERVE: found ${count} development fixture row(s) in the ` +
-        `leads table while APP_ENV="${env}". Seed data has reached a ` +
-        `non-development environment. Remove the rows, then restart. ` +
-        `See ADR-026 — this is deliberate: downtime beats fake data on a live site.`,
+      `REFUSING TO SERVE: found development fixture row(s) (${detail}) while ` +
+        `APP_ENV="${env}". Seed data has reached a non-development ` +
+        `environment. Remove the rows, then restart. See ADR-026 — this is ` +
+        `deliberate: downtime beats fake data on a live site. A fake ` +
+        `astrologer on a registered company's site is someone attempting to ` +
+        `book a person who does not exist.`,
     );
     // process.exit rather than throw: systemd restarts on failure, and a
     // crash-loop with this message in the journal is exactly the loud signal
