@@ -191,6 +191,8 @@ export class RecordingService {
     });
 
     await this.deleteRecording(consultationId, 'consent_withdrawn', actor);
+    // A chat consultation has no audio file; its transcript IS the record.
+    await this.redactTranscript(consultationId, 'consent_withdrawn', actor);
     return { withdrawn: true };
   }
 
@@ -231,6 +233,83 @@ export class RecordingService {
   }
 
   /**
+   * Appends a message to a chat consultation (ADR-051).
+   *
+   * THE SENDER IS ALWAYS A PERSON. `sender` is 'astrologer' or 'customer' and
+   * nothing else — no 'system', no 'bot'. Clause 1 of the Terms states that a
+   * customer in a chat consultation is writing to a named human, and a
+   * machine-authored row in this table would make that false.
+   */
+  async appendMessage(
+    consultationId: string,
+    input: { sender: Party; senderUserId: string; body: string },
+  ) {
+    const c = await this.prisma.consultation.findUnique({ where: { id: consultationId } });
+    if (!c) throw new NotFoundException('No such consultation.');
+    if (c.modality !== 'chat') {
+      throw new ConflictException('That consultation is a voice call, not a chat.');
+    }
+    const body = input.body.trim();
+    if (!body) throw new ConflictException('An empty message cannot be sent.');
+
+    const id = ulid();
+    await this.prisma.chatMessage.create({
+      data: { id, consultationId, sender: input.sender, senderUserId: input.senderUserId, body, sentAt: new Date() },
+    });
+    return { id };
+  }
+
+  /**
+   * The transcript. Redacted messages come back without their body.
+   *
+   * The ROW survives redaction so the shape of the conversation — who sent how
+   * many, and when — stays answerable for a dispute, without the content being
+   * readable.
+   */
+  async transcript(consultationId: string) {
+    const rows = await this.prisma.chatMessage.findMany({
+      where: { consultationId },
+      orderBy: { sentAt: 'asc' },
+    });
+    return rows.map((m) => ({
+      id: m.id,
+      sender: m.sender,
+      sentAt: m.sentAt.toISOString(),
+      body: m.redactedAt ? null : m.body,
+      redacted: m.redactedAt !== null,
+    }));
+  }
+
+  /**
+   * Redacts a transcript — the chat equivalent of deleting an audio file.
+   *
+   * Clause 10 puts a chat transcript under the same retention as a recording,
+   * so the same things must reach it: a withdrawn consent, a DPDP erasure, and
+   * the thirty-day horizon. Bodies are emptied rather than rows dropped.
+   */
+  async redactTranscript(
+    consultationId: string,
+    reason: 'consent_withdrawn' | 'erasure_request' | 'expired',
+    actor: AuditActor,
+  ): Promise<number> {
+    const res = await this.prisma.chatMessage.updateMany({
+      where: { consultationId, redactedAt: null },
+      data: { body: '', redactedAt: new Date() },
+    });
+    if (res.count > 0) {
+      await this.audit.record(this.prisma, {
+        action: 'chat.transcript.redacted',
+        targetType: 'Consultation',
+        targetId: consultationId,
+        after: { reason, messages: res.count },
+        actor,
+      });
+      this.log.log(`Redacted ${res.count} chat message(s) for ${consultationId} (${reason})`);
+    }
+    return res.count;
+  }
+
+  /**
    * Every recording belonging to one customer, deleted.
    *
    * THE ERASURE PATH MUST REACH AUDIO. ADR-040's erasure deletes a lead row and
@@ -254,6 +333,19 @@ export class RecordingService {
     for (const r of recordings) {
       const { objectKey } = await this.deleteRecording(r.consultationId, 'erasure_request', actor);
       if (objectKey) keys.push(objectKey);
+    }
+
+    /*
+     * AND THE CHAT TRANSCRIPTS. An erasure that removed someone's audio but
+     * left every word they typed is not an erasure — and a chat consultation
+     * has no recording row at all, so the loop above would never reach it.
+     */
+    const chats = await this.prisma.consultation.findMany({
+      where: { modality: 'chat', booking: { customerId }, messages: { some: { redactedAt: null } } },
+      select: { id: true },
+    });
+    for (const c of chats) {
+      await this.redactTranscript(c.id, 'erasure_request', actor);
     }
 
     if (recordings.length > 0) {
@@ -287,15 +379,15 @@ export class RecordingService {
    * Lands as `machine_done`, which is a queue position, not a verdict.
    */
   async submitMachineAssessment(
-    recordingId: string,
+    consultationId: string,
     input: { abuseFlagged: boolean; abuseConfidence?: number; notes?: string },
   ) {
-    const rec = await this.prisma.recording.findUnique({ where: { id: recordingId } });
-    if (!rec) throw new NotFoundException('No such recording.');
+    const c = await this.prisma.consultation.findUnique({ where: { id: consultationId } });
+    if (!c) throw new NotFoundException('No such consultation.');
 
     const id = ulid();
-    await this.prisma.recordingAssessment.upsert({
-      where: { recordingId },
+    await this.prisma.consultationAssessment.upsert({
+      where: { consultationId },
       update: {
         status: 'machine_done',
         abuseFlagged: input.abuseFlagged,
@@ -304,14 +396,14 @@ export class RecordingService {
       },
       create: {
         id,
-        recordingId,
+        consultationId,
         status: 'machine_done',
         abuseFlagged: input.abuseFlagged,
         abuseConfidence: input.abuseConfidence ?? null,
         machineNotes: input.notes ?? null,
       },
     });
-    return { recordingId, status: 'machine_done' };
+    return { consultationId, status: 'machine_done' };
   }
 
   /**
@@ -322,21 +414,17 @@ export class RecordingService {
    * complaint about themselves is not review (task 6.9 / owner action O5).
    */
   async review(
-    recordingId: string,
+    consultationId: string,
     input: { reviewerId: string; verdict: Verdict; notes?: string; grade?: number },
     actor: AuditActor,
   ) {
-    const assessment = await this.prisma.recordingAssessment.findUnique({
-      where: { recordingId },
-      include: {
-        recording: {
-          include: { consultation: { include: { booking: { select: { astrologerId: true } } } } },
-        },
-      },
+    const assessment = await this.prisma.consultationAssessment.findUnique({
+      where: { consultationId },
+      include: { consultation: { include: { booking: { select: { astrologerId: true } } } } },
     });
     if (!assessment) throw new NotFoundException('No assessment to review.');
 
-    const astrologerId = assessment.recording.consultation.booking.astrologerId;
+    const astrologerId = assessment.consultation.booking.astrologerId;
     const reviewerProfile = await this.prisma.astrologer.findUnique({
       where: { userId: input.reviewerId },
       select: { id: true },
@@ -352,8 +440,8 @@ export class RecordingService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.recordingAssessment.update({
-        where: { recordingId },
+      await tx.consultationAssessment.update({
+        where: { consultationId },
         data: {
           // `published` is the only status the astrologer ever sees.
           status: input.verdict === 'upheld' ? 'published' : 'dismissed',
@@ -365,16 +453,16 @@ export class RecordingService {
         },
       });
       await this.audit.record(tx, {
-        action: 'recording.assessment.reviewed',
-        targetType: 'Recording',
-        targetId: recordingId,
+        action: 'consultation.assessment.reviewed',
+        targetType: 'Consultation',
+        targetId: consultationId,
         before: { status: assessment.status, machineFlagged: assessment.abuseFlagged },
         after: { verdict: input.verdict, grade: input.grade ?? null },
         actor,
       });
     });
 
-    return { recordingId, verdict: input.verdict };
+    return { consultationId, verdict: input.verdict };
   }
 
   /**
@@ -385,14 +473,14 @@ export class RecordingService {
    * under suspicion without telling them of what.
    */
   async publishedForAstrologer(astrologerId: string) {
-    const rows = await this.prisma.recordingAssessment.findMany({
+    const rows = await this.prisma.consultationAssessment.findMany({
       where: {
         status: 'published',
-        recording: { consultation: { booking: { astrologerId } } },
+        consultation: { booking: { astrologerId } },
       },
       select: {
         id: true, grade: true, reviewerNotes: true, reviewedAt: true,
-        recording: { select: { consultationId: true } },
+        consultationId: true,
       },
       orderBy: { reviewedAt: 'desc' },
       take: 50,

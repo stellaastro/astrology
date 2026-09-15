@@ -1951,3 +1951,54 @@ Nothing exposes this over HTTP. Two owner decisions gate any route that could
 start a recording — the consent wording, and who reviews a flagged call.
 Shipping the endpoint first invites the mechanism being used before those
 answers exist, which is the failure this whole ADR is about.
+
+---
+
+## ADR-051 — Chat consultations: a human, per session, same record obligations
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Owner decisions:** chat is
+offered; the other party is a **human astrologer** in a chat-style interface;
+charged **per session, like voice**
+
+This closes the Phase 8 blocker the plan recorded as "chat or voice for first
+revenue?" — the answer is **both**, sharing one booking model.
+
+**A named human, not software.** The interface borrows the chatbot idiom; the
+correspondent does not. `ChatMessage.sender` is `astrologer` or `customer` and
+nothing else — no `system`, no `bot` — because clause 1 of the Terms now states
+that a customer in a chat consultation is writing to a named human, and a
+machine-authored row in that table would make the Terms false. This also keeps
+CLAUDE.md §15 intact: AI never computes planetary positions.
+
+**Per session, which is why this was cheap.** Chat reuses the booking, the slot,
+the price snapshot and the availability model unchanged. The alternatives both
+had a cost the plan had already paid to avoid: per-message bundles are prepaid
+stored value, which is the wallet ADR-023 removed; per-minute reintroduces the
+metering ADR-024 removed and which the Terms had just been rewritten to
+eliminate.
+
+**The transcript is the record.** A voice consultation has an audio file; a chat
+consultation has its messages, and they carry the *same* retention, review and
+erasure obligations (Terms clause 10 says so explicitly). Two consequences:
+
+- **`RecordingAssessment` became `ConsultationAssessment`**, keyed to the
+  consultation rather than the artifact. Keying the review queue to `Recording`
+  would have meant a second, parallel pipeline for chat — and a second place
+  for "a machine result is only ever a draft" to be forgotten. The migration
+  drops the old table, which is safe *only* because it was empty in both
+  environments; verified by counting before writing the migration, and recorded
+  in it.
+- **Erasure had a hole.** `deleteForCustomer` iterated recordings, and a chat
+  consultation has no recording row at all, so it would have removed someone's
+  audio and left every word they typed. It now redacts transcripts too. Proven
+  by deleting that branch and watching the test fail.
+
+**Redaction empties bodies, keeps rows.** Who sent how many messages and when
+stays answerable for a dispute; the content does not. A dropped row would take
+the shape of the conversation with it.
+
+**One thing the Terms say plainly rather than pretending otherwise.** A chat
+consultation cannot happen without its messages being stored — the conversation
+*is* the writing. So clause 12 tells a customer who does not want a written
+record to book a voice consultation and decline recording, instead of offering a
+consent that could not meaningfully be refused.

@@ -43,9 +43,16 @@ STELLA is a technology platform that enables customers to discover and communica
 
 Customers may use STELLA to obtain astrology-related consultations and general life guidance.
 
-**The service currently offered is the scheduled voice consultation**: the Customer selects an Astrologer, chooses an available appointment time, pays for that appointment, and speaks with the Astrologer at the appointed time through the Platform.
+**STELLA offers scheduled consultations in two forms:**
 
-STELLA may introduce further services — including chat consultations, horoscope and birth-chart services, astrology reports and compatibility analysis — and will make the applicable terms and charges available before any such service is offered.
+* **Voice consultations** — the Customer speaks with the Astrologer through the Platform at the appointed time.
+* **Chat consultations** — the Customer exchanges written messages with the Astrologer through the Platform during the appointed session.
+
+In both cases the Customer selects an Astrologer, chooses an available appointment time, pays for that appointment, and consults with the Astrologer at the appointed time.
+
+**In a chat consultation the Customer is writing to a named human Astrologer, not to automated software.** STELLA does not generate astrological readings by machine and does not present software output as the words of an Astrologer.
+
+STELLA may introduce further services — including horoscope and birth-chart services, astrology reports and compatibility analysis — and will make the applicable terms and charges available before any such service is offered.
 
 STELLA primarily acts as an **intermediary technology platform connecting Customers and Astrologers**.
 
@@ -125,14 +132,15 @@ STELLA may verify certain information supplied by Astrologers, but such verifica
 
 Different Astrologers may charge different consultation rates.
 
-**Consultations are charged by the appointment, not by the minute.** A booked thirty-minute appointment is charged as a thirty-minute appointment.
+**Consultations are charged by the appointment, not by the minute and not by the message.** A booked thirty-minute appointment is charged as a thirty-minute appointment, whether it is held by voice or by chat.
 
 The Astrologer, the appointment time, the appointment length and the total amount payable are displayed before the Customer confirms and pays for the booking.
 
 Because charging is by the appointment:
 
 * no per-minute meter runs during the consultation;
-* a pause in the conversation is not charged separately; and
+* a pause in the conversation is not charged separately;
+* in a chat consultation, the number of messages sent does not change the price; and
 * a consultation that ends earlier than the booked appointment length is not charged less, and a Customer is not entitled to a partial refund on that basis alone.
 
 Where a consultation is affected by a verified Platform or communication failure, the Customer may raise a billing dispute under clause 18.
@@ -162,13 +170,17 @@ For voice consultations, STELLA's systems or its authorised communication provid
 
 Customers should review the appointment details and the amount payable before confirming a booking.
 
-## 10. MESSAGING AND FUTURE CHAT CONSULTATIONS
+## 10. CHAT CONSULTATIONS
 
-**STELLA does not currently offer chat consultations.** If chat consultations are introduced, the applicable charges and billing method will be displayed before any such consultation begins, and these Terms will be updated accordingly.
+A chat consultation is a written conversation with a named human Astrologer, held during a booked appointment.
 
-Where the Platform provides any messaging facility, Customers must not use it to transmit unlawful, threatening, abusive, obscene, defamatory or otherwise prohibited material.
+**A chat consultation is charged by the appointment, in the same way as a voice consultation (clause 7).** The number of messages sent does not change the price, and there is no separate per-message or per-minute charge.
 
-STELLA may retain messages sent through the Platform where reasonably necessary for service delivery, dispute resolution, fraud prevention, safety, legal compliance and other purposes described in its Privacy Policy.
+The chat becomes available at the start of the booked appointment and closes at the end of it. Messages sent within the session are delivered through the Platform; Customers and Astrologers should not move the conversation to another channel (clause 16).
+
+**Chat consultations are recorded in the sense that the messages are stored.** The transcript of a chat consultation is retained on the same basis, for the same purposes and for the same period as a voice recording under clause 12, and is treated as consultation content under the Privacy Policy.
+
+Customers must not use the chat facility to transmit unlawful, threatening, abusive, obscene, defamatory or otherwise prohibited material (clause 15).
 
 ## 11. PRIVACY OF PHONE NUMBERS AND PERSONAL CONTACT DETAILS
 
@@ -182,6 +194,8 @@ STELLA cannot guarantee confidentiality for information that a Customer voluntar
 
 ## 12. CALL RECORDING
 
+This clause applies to **audio recordings of voice consultations and to transcripts of chat consultations alike**. Where these Terms refer to a recording, a chat transcript is included.
+
 Certain consultations may be recorded for legitimate purposes such as:
 
 * customer safety;
@@ -193,6 +207,8 @@ Certain consultations may be recorded for legitimate purposes such as:
 * improvement of Platform services.
 
 Where recording is enabled, STELLA will provide appropriate notice and obtain consent where required by applicable law.
+
+**A chat consultation cannot take place without its messages being stored**, because the conversation is conducted in writing through the Platform. A Customer who does not wish a written record to exist should book a voice consultation and decline recording.
 
 Recordings will be handled in accordance with STELLA's Privacy Policy, applicable consent requirements and data-retention practices.
 
@@ -429,7 +445,8 @@ By creating an account and using STELLA, you acknowledge that:
 4. Astrology is not a substitute for medical, legal, financial or other regulated professional advice.
 5. Consultations are charged by the booked appointment rather than by the minute, at the amount displayed before you pay.
 6. Payment is taken when you book. STELLA does not operate a wallet and does not hold your funds.
-7. Calls may be recorded where this is disclosed to you and you have consented, and that consent is asked for separately at or before the consultation.
+7. Calls may be recorded, and chat consultations are stored as a written transcript, where this is disclosed to you and you have consented; that consent is asked for separately at or before the consultation.
+11. In a chat consultation you are writing to a named human Astrologer, not to automated software.
 8. You are responsible for decisions you make after receiving an astrology consultation.
 9. You have read STELLA's Privacy Policy and applicable payment/refund policies.
 10. You agree to comply with STELLA's Customer Conduct requirements.

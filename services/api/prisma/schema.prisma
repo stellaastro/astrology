@@ -578,7 +578,12 @@ model Consultation {
   bookingId String  @unique @map("booking_id") @db.Char(26)
   booking   Booking @relation(fields: [bookingId], references: [id], onUpdate: NoAction)
 
+  /// 'voice' or 'chat' (ADR-051). Fixed when the booking is made, because the
+  /// customer chose and paid for one or the other.
+  modality String @default("voice") @db.VarChar(8)
+
   /// The 100ms room, created per consultation. Never a shared room (ADR-047).
+  /// Null for a chat consultation — there is no call to join.
   roomId String? @map("room_id") @db.VarChar(64)
 
   startedAt DateTime? @map("started_at")
@@ -593,6 +598,10 @@ model Consultation {
 
   consents  RecordingConsent[]
   recording Recording?
+  messages  ChatMessage[]
+
+  /// One review queue for both modalities (ADR-051).
+  assessment ConsultationAssessment?
 
   @@map("consultations")
 }
@@ -664,8 +673,6 @@ model Recording {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  assessment RecordingAssessment?
-
   @@index([status, expiresAt])
   @@map("recordings")
 }
@@ -676,11 +683,18 @@ model Recording {
 /// Hindi and regional languages will produce false positives, and telling an
 /// astrologer that software judged them abusive is defamatory when it is wrong.
 /// So a machine result is a DRAFT until a named person has listened.
-model RecordingAssessment {
+model ConsultationAssessment {
   id String @id @db.Char(26)
 
-  recordingId String    @unique @map("recording_id") @db.Char(26)
-  recording   Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  /// THE SUBJECT IS THE CONSULTATION, not the artifact.
+  ///
+  /// Renamed from RecordingAssessment when chat landed: a chat consultation has
+  /// a transcript rather than a recording, and it needs exactly the same review
+  /// gate. Keying the queue to `Recording` would have meant a second, parallel
+  /// pipeline for chat — and a second place for the "a machine result is a
+  /// draft" rule to be forgotten.
+  consultationId String       @unique @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
 
   /// pending · machine_done · under_review · published · dismissed
   ///
@@ -712,7 +726,41 @@ model RecordingAssessment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([status])
-  @@map("recording_assessments")
+  @@map("consultation_assessments")
+}
+
+/// One message in a chat consultation (ADR-051).
+///
+/// The transcript IS the consultation record, in the way an audio file is for a
+/// voice call — so it carries the same retention, the same review path and the
+/// same erasure obligations. A chat consultation cannot happen without this
+/// being stored, which is why clause 10 of the Terms says so plainly rather
+/// than asking for a consent that could not be declined.
+model ChatMessage {
+  id String @id @db.Char(26) // ULID, so ordering is the insertion order
+
+  consultationId String       @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// 'astrologer' or 'customer'. Never 'system' or 'bot': the Terms state that
+  /// a customer is writing to a named human, and a machine-authored message in
+  /// this table would make that false.
+  sender String @db.VarChar(16)
+
+  /// The account that sent it, so authorship survives a display-name change.
+  senderUserId String @map("sender_user_id") @db.Char(26)
+
+  body String @db.Text
+
+  sentAt DateTime @map("sent_at")
+
+  /// Cleared on erasure or when retention expires. The ROW stays so the
+  /// transcript's shape — who sent how many, and when — remains answerable
+  /// without the content.
+  redactedAt DateTime? @map("redacted_at")
+
+  @@index([consultationId, sentAt])
+  @@map("chat_messages")
 }
 
 /// A recorded acceptance of one policy, at one version (ADR-050).
