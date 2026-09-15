@@ -80,6 +80,19 @@ is visible in the browser within a second or two. No build, no deploy.
 
 Production is untouched; it keeps serving the optimised build on `:3000`.
 
+The live web service currently uses `.next-release-hero-objects-larger`, selected by
+`/etc/systemd/system/stella-web.service.d/hero-release.conf` through
+`NEXT_DIST_DIR`. This release includes the dedicated celestial foreground,
+inward-tilted animated details, and automatic motion without controls. The
+hero fits the viewport below the header, with a background that covers the
+section. The rings and artwork have received a further 10% increase (stage scale .968); five detached celestial objects
+rotate independently around their own centres, and the armillary globe is removed.
+Pointer parallax remains disabled. The previous `.next-release-hero-objects`
+build remains available for rollback. Future deployments
+must build a new release directory and update the service's `NEXT_DIST_DIR`;
+editing source or building `.next-prod` alone does not update the live service.
+
+
 ```bash
 sudo systemctl status  stella-dev
 sudo systemctl restart stella-dev      # after next.config.mjs or dependency changes

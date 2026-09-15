@@ -55,23 +55,62 @@ const emit = (file, width, bytes) => {
   emit('mark.webp', 128, statSync(dest).size);
 }
 
-/* ── Hero zodiac wheel ───────────────────────────────────────────
- * The central object of the hero's celestial stage, and the one piece of that
- * scene that is real artwork rather than an SVG stand-in. It renders up to
- * ~620px and rotates continuously, so it needs genuine resolution — the 128px
- * mark would visibly break up.
- *
- * Reusing images/logo/stella.png means the hero wheel and the brand mark are
- * the same drawing and cannot drift apart. It is also why the scene labels
- * signs in Devanagari (ADR-035) rather than Western glyphs.
+/* ── Dedicated hero foreground ──────────────────────────────────
+ * Independent from the header logo. Preserve alpha so the supplied landscape
+ * remains visible around the antique astrolabe and planets.
  */
 {
-  const dest = join(OUT, 'wheel.webp');
-  await sharp(WHEEL_SRC)
-    .resize({ width: 700, withoutEnlargement: true })
-    .webp({ quality: 86, effort: 6 })
-    .toFile(dest);
-  emit('wheel.webp', 700, statSync(dest).size);
+  const src = join(ROOT, 'images/celestial/assembly.png');
+  if (!existsSync(src)) throw new Error(`Missing hero artwork: ${src}`);
+  before += statSync(src).size;
+  for (const [file, width] of [['celestial-assembly.webp', 1200], ['celestial-assembly-mobile.webp', 640]]) {
+    const dest = join(OUT, file);
+    await sharp(src).resize({ width, withoutEnlargement: true })
+      .webp({ quality: 86, alphaQuality: 100, effort: 6 }).toFile(dest);
+    emit(file, width, statSync(dest).size);
+  }
+}
+
+/* Independently animated objects from the edited sprite sheet. The generator
+ * supplied a neutral checkerboard; remove only connected neutral backdrop
+ * pixels, preserving the warm artwork and its internal detail. */
+{
+  const src = join(ROOT, 'images/celestial/separated-sheet.png');
+  const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const seen = new Uint8Array(width * height);
+  const queue = [];
+  const visit = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const index = y * width + x;
+    if (seen[index]) return;
+    seen[index] = 1;
+    const i = index * 4;
+    const spread = Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+    if (spread > 18 || data[i] < 70) return;
+    data[i + 3] = 0;
+    queue.push(index);
+  };
+  for (let x = 0; x < width; x++) { visit(x, 0); visit(x, height - 1); }
+  for (let y = 0; y < height; y++) { visit(0, y); visit(width - 1, y); }
+  for (let n = 0; n < queue.length; n++) {
+    const x = queue[n] % width, y = Math.floor(queue[n] / width);
+    visit(x - 1, y); visit(x + 1, y); visit(x, y - 1); visit(x, y + 1);
+  }
+  const objects = [
+    ['main-dial', 0, 60, 560, 605],
+    ['moon', 558, 260, 301, 330],
+    ['saturn', 857, 260, 397, 330],
+    ['mars', 35, 765, 395, 400],
+    ['jade', 525, 830, 295, 290],
+    ['crescent', 900, 750, 320, 410],
+  ];
+  for (const [name, left, top, w, h] of objects) {
+    const file = `celestial-${name}.webp`;
+    await sharp(data, { raw: info }).extract({ left, top, width: w, height: h })
+      .webp({ quality: 90, alphaQuality: 100, effort: 6 }).toFile(join(OUT, file));
+    emit(file, w, statSync(join(OUT, file)).size);
+  }
 }
 
 /* ── Hero sky and landscape ──────────────────────────────────────
@@ -87,7 +126,7 @@ const emit = (file, width, bytes) => {
   const dir = join(ROOT, 'images/herosection');
   const dest = join(OUT, 'hero-sky.webp');
   const source = existsSync(dir)
-    ? readdirSync(dir).filter((f) => /\.(png|jpe?g|webp|avif)$/i.test(f)).sort()[0]
+    ? (existsSync(join(dir, 'hero_bg.png')) ? 'hero_bg.png' : readdirSync(dir).filter((f) => /\.(png|jpe?g|webp|avif)$/i.test(f)).sort()[0])
     : undefined;
 
   if (source) {
