@@ -560,8 +560,154 @@ model Booking {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  consultation Consultation?
+
   @@index([astrologerId, slotStart])
   @@index([customerId])
   @@index([status, holdExpiresAt])
   @@map("bookings")
+}
+
+/// The session itself — one per booking (ADR-048).
+model Consultation {
+  id String @id @db.Char(26) // ULID
+
+  bookingId String  @unique @map("booking_id") @db.Char(26)
+  booking   Booking @relation(fields: [bookingId], references: [id], onUpdate: NoAction)
+
+  /// The 100ms room, created per consultation. Never a shared room (ADR-047).
+  roomId String? @map("room_id") @db.VarChar(64)
+
+  startedAt DateTime? @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  /// Join/leave is the only honest no-show signal (task 6.8).
+  astrologerJoinedAt DateTime? @map("astrologer_joined_at")
+  customerJoinedAt   DateTime? @map("customer_joined_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  consents  RecordingConsent[]
+  recording Recording?
+
+  @@map("consultations")
+}
+
+/// One party's consent to being recorded (ADR-048).
+///
+/// A ROW PER PARTY, not a boolean on the consultation. Recording needs BOTH,
+/// and a single flag cannot say who agreed to what — which is the only thing
+/// that matters if it is ever questioned.
+///
+/// Stored as an artifact with a policy version and a timestamp, the same shape
+/// as lead consent: "they agreed" without a record of what they agreed to is
+/// not consent.
+model RecordingConsent {
+  id String @id @db.Char(26)
+
+  consultationId String       @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// 'astrologer' or 'customer'.
+  party String @db.VarChar(16)
+
+  /// The account that answered. Kept so a later question has an answer.
+  userId String @map("user_id") @db.Char(26)
+
+  /// TRUE is consent, FALSE is refusal, and a refusal is recorded rather than
+  /// treated as an absent answer. "They never replied" and "they said no" are
+  /// different facts and only one of them is a decision.
+  granted Boolean
+
+  /// What they were shown. Without this, consent cannot be demonstrated.
+  policyVersion String   @map("policy_version") @db.VarChar(32)
+  decidedAt     DateTime @map("decided_at")
+
+  /// Set when withdrawn. Withdrawal deletes the recording; this row stays as
+  /// the record that it was withdrawn and when.
+  withdrawnAt DateTime? @map("withdrawn_at")
+
+  @@unique([consultationId, party])
+  @@index([userId])
+  @@map("recording_consents")
+}
+
+/// A stored audio recording (ADR-048).
+model Recording {
+  id String @id @db.Char(26)
+
+  consultationId String       @unique @map("consultation_id") @db.Char(26)
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  /// The R2 object key in `stella-recordings`. NEVER a URL: the bucket is
+  /// private and links are signed at read time with a short TTL (ADR-042).
+  objectKey String? @map("object_key") @db.VarChar(255)
+
+  durationSeconds Int? @map("duration_seconds")
+  sizeBytes       Int? @map("size_bytes")
+
+  /// pending · stored · failed · deleted
+  status String @db.VarChar(16)
+
+  /// When R2's own lifecycle rule will remove the object. Recorded so the
+  /// database agrees with the bucket rather than guessing at it.
+  expiresAt DateTime? @map("expires_at")
+
+  /// Set when removed before expiry — a withdrawn consent or a DPDP erasure.
+  deletedAt     DateTime? @map("deleted_at")
+  deletedReason String?   @map("deleted_reason") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assessment RecordingAssessment?
+
+  @@index([status, expiresAt])
+  @@map("recordings")
+}
+
+/// A machine assessment of a recording, and its human review (ADR-048).
+///
+/// THE WHOLE POINT OF THIS TABLE IS THE REVIEW GATE. Automated analysis over
+/// Hindi and regional languages will produce false positives, and telling an
+/// astrologer that software judged them abusive is defamatory when it is wrong.
+/// So a machine result is a DRAFT until a named person has listened.
+model RecordingAssessment {
+  id String @id @db.Char(26)
+
+  recordingId String    @unique @map("recording_id") @db.Char(26)
+  recording   Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  /// pending · machine_done · under_review · published · dismissed
+  ///
+  /// Only `published` is visible to the astrologer. Nothing reaches them
+  /// straight from the machine.
+  status String @db.VarChar(16)
+
+  /// What the machine thought. Advisory, never a finding.
+  abuseFlagged    Boolean @default(false) @map("abuse_flagged")
+  /// 0–100. Kept as an integer; a confidence as a float invites false
+  /// precision in a number that is already a guess.
+  abuseConfidence Int?    @map("abuse_confidence")
+  machineNotes    String? @map("machine_notes") @db.Text
+
+  /// The reviewer's decision. Set only by a human.
+  ///
+  /// The reviewer MAY NOT be the astrologer being assessed — enforced in the
+  /// service, because at roster 3 they are otherwise the only available
+  /// reviewer (the four-eyes gap in task 6.9 / owner action O5).
+  reviewerId      String?   @map("reviewer_id") @db.Char(26)
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewerVerdict String?   @map("reviewer_verdict") @db.VarChar(16)
+  reviewerNotes   String?   @map("reviewer_notes") @db.Text
+
+  /// Published grade, 1–5. Null until a human publishes it.
+  grade Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("recording_assessments")
 }

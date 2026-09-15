@@ -1884,3 +1884,70 @@ concerned.
 The bucket, its 30-day enforced expiry, and its isolation exist now, because
 they are the parts that are dangerous to add late: a recording written to the
 wrong bucket, or with no expiry, is one that outlives its lawful basis.
+
+
+---
+
+## ADR-049 — The recording pipeline, and the three gates it enforces
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Implements:** ADR-048
+
+**Decision.** `RecordingService` owns consent, recording, deletion and
+assessment. Three properties are **enforced in code and proven by mutation
+testing**, because each is something a reasonable person gets wrong under time
+pressure.
+
+### Gate 1 — no consent, no recording
+
+`startRecording` refuses unless **both** parties granted and **neither**
+withdrew. A missing row is refusal: never asked is not consent.
+
+It fails **loudly**, with a 409 naming the reason. A consultation that quietly
+is not being recorded looks identical to one that is, and nobody finds out
+which until it matters.
+
+A **refusal is stored**, not left blank. "They never replied" and "they said no"
+are different facts and only one is a decision.
+
+*Proven:* removing the gate fails three tests.
+
+### Gate 2 — a machine result is a draft
+
+`submitMachineAssessment` writes `machine_done`, which is a queue position, not
+a verdict. Only a human `review` can set `published`, and only `published` is
+visible to the astrologer — not even "pending", which would tell someone they
+are under suspicion without telling them of what.
+
+*Proven:* letting the machine write `published` fails a test.
+
+### Gate 3 — the reviewer may not be the subject
+
+`review` refuses when the reviewer's astrologer profile is the one being
+assessed. At a roster of three they are otherwise the only available reviewer,
+and adjudicating a complaint about yourself is not review — the same four-eyes
+gap as task 6.9 (owner action O5).
+
+The audit keeps **both** the machine result and the human verdict, so "the
+machine flagged abuse and a human disagreed" stays answerable.
+
+*Proven:* removing the check fails a test.
+
+### Deletion is deletion
+
+`deleteRecording` clears the object key and **returns it to the caller** to
+remove from R2. Marking a row deleted while the audio survives is theatre.
+
+`deleteForCustomer` extends the ADR-040 erasure path to audio. A customer who
+has had consultations has recordings of their voice, which are more sensitive
+than the address that path was built for; an erasure that leaves them is not
+one.
+
+`reconcileExpired` squares the database with R2's own 30-day lifecycle, so a row
+never points at a key the bucket has already removed.
+
+### No endpoints yet, deliberately
+
+Nothing exposes this over HTTP. Two owner decisions gate any route that could
+start a recording — the consent wording, and who reviews a flagged call.
+Shipping the endpoint first invites the mechanism being used before those
+answers exist, which is the failure this whole ADR is about.
