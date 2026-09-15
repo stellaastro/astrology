@@ -16,10 +16,20 @@
   color: var(--ink);
 }
 
+/* The icon sits INSIDE the control, so the wrapper is the positioning context
+   and the input carries padding wide enough to clear it. */
+.control { position: relative; display: flex; align-items: center; }
+.icon {
+  position: absolute;
+  left: .8rem;
+  color: var(--ink-soft);
+  pointer-events: none;   /* clicking the icon must still focus the field */
+}
+
 .input {
   width: 100%;
   min-height: 48px;
-  padding: .6rem .85rem;
+  padding: .6rem .85rem .6rem 2.5rem;
   border: 1px solid var(--ink-soft);
   border-radius: var(--radius);
   /* The panel is --surface-2, so the field steps DOWN to --surface to stay
@@ -31,10 +41,38 @@
   transition: border-color var(--dur-fast) var(--ease);
 }
 
+/* Reserve room for the reveal button so a long password never runs under it. */
+.inputReveal { padding-right: 3rem; }
+
+.input::placeholder { color: var(--ink-soft); opacity: .75; }
 .input:hover { border-color: var(--ink); }
 .input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 
+/* 44px minimum, per DESIGN.md §3 — it applies to icon-only controls too, and
+   this is the one most likely to be built at 24px because the glyph is small. */
+.reveal {
+  position: absolute;
+  right: .35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.reveal:hover { color: var(--ink); }
+.reveal:focus-visible { outline: 3px solid var(--ink); outline-offset: -1px; }
+
 .submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
   width: 100%;
   min-height: 48px;
   padding: 0 1.35rem;

@@ -425,23 +425,25 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
   .sechead::before { width: 78px; }
 }
 
-/* ── Sign-in ─────────────────────────────────────────────────────
-   /admin/login was a bare 24rem form floating at the top-left of an empty
-   ivory field. It is a threshold — the one page whose whole job is to feel
-   like a front door — so it gets the inverted surface and the brand mark, and
-   the form becomes a panel that has plainly earned being one.
+/* ── Sign-in: split card ────────────────────────────────────────
+   Brand on the left, form on the right, one card floating on the botanical
+   ground. The page renders with NO header and NO footer (BARE_ROUTES in
+   SiteChrome), so the card is the whole composition.
 
-   The form sits INSIDE an ivory panel rather than directly on the umber, which
-   is what keeps the normal terracotta CTA valid (5.84:1 on --surface-2). Put
-   that button straight onto the dark ground and it would be 2.27:1 — the panel
-   is carrying the contrast here, so it is structural, not decoration. */
+   The form sits on an ivory panel rather than on the umber, which is what
+   keeps the normal terracotta CTA valid (5.84:1 on --surface-2). Put that
+   button straight onto the umber and it would be 2.27:1 — the panel carries
+   the contrast, so it is structural rather than decoration. */
 .signin {
   position: relative;
   overflow: hidden;
   display: grid;
   place-items: center;
-  padding: var(--s6) var(--s3);
-  background: var(--dark-ground);
+  /* svh, not vh: on mobile browsers vh is the TALLEST viewport, so the ground
+     would fall short while the address bar is showing. */
+  min-height: 100svh;
+  padding: var(--s4) var(--s3);
+  background: var(--surface);
 }
 .signin::before {
   content: "";
@@ -449,51 +451,143 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
   inset: 0;
   background-image: url("/botanical.svg");
   background-size: 200px 200px;
-  opacity: .03;   /* see the note on .band-dark — 5.2% on umber */
+  opacity: .06;
   pointer-events: none;
 }
-.signinInner {
+
+.signinCard {
   position: relative;
   z-index: 1;
-  width: min(29rem, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 520px);
+  width: 100%;
+  max-width: 940px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;            /* so the panels inherit the card's corners */
+  border: 1px solid var(--rule);
+  /* Greyscale — a scrim, not a brand colour, which is the rule the rgba lint
+     enforces. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 30px 70px rgba(0, 0, 0, .13);
 }
-.signinHead { text-align: center; margin-bottom: var(--s4); }
-.signinHead img {
-  width: 74px;
-  height: 74px;
+
+/* ── Left: the brand panel ───────────────────────────────────── */
+.signinBrand {
+  position: relative;
+  overflow: hidden;
+  background: var(--dark-ground);
+  color: var(--dark-soft);
+  padding: var(--s5) var(--s4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.signinBrand::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("/botanical.svg");
+  background-size: 200px 200px;
+  opacity: .03;                /* 5.2% on umber — see the note on .band-dark */
+  pointer-events: none;
+}
+.signinBrand > * { position: relative; z-index: 1; }
+
+.signinMark {
+  width: 104px;
+  height: 104px;
   border-radius: 50%;
   margin-bottom: var(--s3);
 }
-.signinHead .eyebrow { color: var(--dark-muted); margin-bottom: var(--s1); }
-.signinHead h1 {
-  font-size: var(--step-4);
+.signinBrand h2 {
+  font-family: var(--font-display-lat);
+  font-size: var(--step-3);
+  font-weight: 600;
+  letter-spacing: .06em;
   color: var(--dark-text);
-  margin-bottom: var(--s1);
+  margin-bottom: .35rem;
 }
-.signinHead p {
+/* Gold would be the obvious colour here and the lint bans it as text on every
+   surface. --dark-muted is 6.33:1 on umber and carries the same warmth. */
+.signinPlace {
+  margin: 0 0 var(--s3);
+  color: var(--dark-muted);
+  font-size: .72rem;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+/* The pill carries the CIN — a real, checkable registration number, which is
+   the one piece of corporate identity this page can state without inventing
+   anything. */
+.signinPill {
   margin: 0;
+  padding: .6rem 1.1rem;
+  border: 1px solid var(--dark-border);
+  border-radius: 999px;
   color: var(--dark-soft);
   font-size: var(--step--1);
+  line-height: 1.5;
 }
-/* The panel lifts off the dark ground. Greyscale shadow — it is a scrim, not
-   a brand colour, which is the rule the rgba lint enforces. */
-.signinPanel {
+.signinRule {
+  width: 76px;
+  height: 2px;
+  margin: var(--s4) 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+.signinContact {
+  margin: 0;
+  font-style: normal;          /* <address> is italic by default */
+  display: grid;
+  gap: var(--s2);
+  font-size: var(--step--1);
+  color: var(--dark-soft);
+}
+.signinContact a { color: var(--dark-text); }
+.signinContact a:visited { color: var(--dark-text); }
+.signinContact span {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  justify-content: center;
+}
+.signinContact svg { flex: none; color: var(--dark-muted); }
+
+/* ── Right: the form panel ───────────────────────────────────── */
+.signinForm {
   background: var(--surface-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: var(--s4);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, .30);
+  padding: var(--s5) var(--s4);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.signinForm .eyebrow { color: var(--cta); margin-bottom: var(--s2); }
+.signinForm h1 {
+  font-size: var(--step-4);
+  margin-bottom: .4rem;
+}
+.signinLede {
+  margin: 0 0 var(--s4);
+  color: var(--ink-soft);
 }
 
-@media (max-width: 860px) {
-  .signin { padding: var(--s5) var(--s3); }
-  .signinPanel { padding: var(--s3); }
-  .signinHead img { width: 58px; height: 58px; }
+@media (max-width: 900px) {
+  .signin { padding: 0; }
+  .signinCard {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    min-height: 100svh;
+    align-content: center;
+  }
+  /* The brand panel becomes a compact head rather than half the screen. */
+  .signinBrand { padding: var(--s4) var(--s3); }
+  .signinMark { width: 72px; height: 72px; }
+  .signinRule { margin: var(--s3) 0; }
+  .signinForm { padding: var(--s4) var(--s3); }
 }
-
-/* The waitlist is the one thing the page can actually DO today, so it gets a
-   panel and a width that keeps the field comfortable rather than page-wide. */
-.waitlistPanel { max-width: 34rem; }
 
 /* ── Focus rings on dark surfaces ────────────────────────────────
    The global ring is `3px solid var(--ink)`, and --ink is #48251C — the SAME
@@ -514,6 +608,6 @@ footer :focus-visible,
    ivory ring there would be the same bug mirrored, so it goes back to ink.
    Must stay AFTER the rule above: equal specificity, so source order decides. */
 .panel :focus-visible,
-.signinPanel :focus-visible {
+.signinForm :focus-visible {
   outline-color: var(--ink);
 }

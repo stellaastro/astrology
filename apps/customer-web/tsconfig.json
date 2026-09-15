@@ -20,6 +20,7 @@
     "**/*.tsx",
     ".next-dev/types/**/*.ts",
     ".next-prod/types/**/*.ts",
+    ".next-release-admin/types/**/*.ts",
     ".next-release-confirm/types/**/*.ts",
     ".next-release-hero-objects-larger/types/**/*.ts",
     ".next-release-hero-objects/types/**/*.ts",
@@ -30,7 +31,7 @@
     ".next-release-phase2/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-release-admin/types/**/*.ts"
+    ".next-release-design/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
