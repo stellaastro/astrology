@@ -1477,3 +1477,69 @@ the nightly backup currently holds a credential that could delete its own
 bucket and, once KYC exists, read KYC documents. Replacing these with three
 bucket-scoped `Object Read & Write` tokens is an owner action in the Cloudflare
 dashboard and **should happen before the first real KYC document is stored**.
+
+---
+
+## ADR-043 — Astrologer profiles: admin-created, draft by default, paise only
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Task:** 4.1
+
+**Decision.** An `Astrologer` model holding the public profile and the
+commercial terms. Created by an administrator, never by self-signup, and
+invisible to the public until a human publishes it.
+
+**No self-signup, and no KYC pipeline.** At a roster of twelve or fewer, a KYC
+automation pipeline costs more than it protects (ADR-033, against Edition 2.0).
+A person with admin rights types the profile in; the practitioner's account is
+linked when they first sign in. `userId` is therefore nullable, and that is the
+normal state of a fresh profile — the profile is the record, the account is
+only how they reach it.
+
+**Every profile is created as a draft.** Publishing is a separate call with its
+own audit action, because it is the one decision on this model with
+consequences outside the admin screen. Nothing reaches the public site as a
+side effect of being typed in.
+
+**The public surface is real or empty**, enforced in three places rather than
+one, because this is the rule §13 and §71 both exist to protect:
+
+1. `listPublic()` filters on `publishedAt`, `retiredAt` **and**
+   `isDevFixture: false`. The fixture filter is not redundant with the boot
+   guard: the guard protects production, and without this filter a development
+   demo of the public page would show twenty invented practitioners and look
+   entirely correct.
+2. `setPublished` refuses to publish a fixture at all — a clear 409 in
+   development rather than a crash-loop in production.
+3. `FixtureGuard` refuses to boot when fixture rows exist under a
+   non-development profile, now covering astrologers as well as leads.
+
+Verified against the real database, not doubles: with 20 fixtures of which 18
+are published, the public endpoint returns 0 — and adding one genuine published
+row returns 1, which is the check that distinguishes correct filtering from a
+filter that excludes everything.
+
+**The rate is integer paise and arrives as a string.** `"1250.50"` through JSON
+is a float, and a float is what integer-paise Money exists to keep off the
+money path. The DTO takes a string, `Money.fromString` parses it, and sub-paise
+precision is rejected rather than rounded quietly.
+
+**The API returns BOTH `sessionRatePaise` and `sessionRateDisplay`.** An earlier
+version returned only the formatted string — which is `₹1,250.50`, a localised
+display string with a currency symbol and Indian digit grouping. Putting that
+in a payload forces every client to parse it back into a number, and parsing a
+formatted currency is exactly where a float creeps back in.
+
+**This column is the CURRENT rate and nothing else.** A booking freezes its own
+price snapshot at creation (§79, Phase 6) and must never read back through
+here; otherwise editing a rate would silently rewrite the price of every past
+booking. A rate change is audited with both the old and new value, so "what did
+this cost last month" is answerable from the trail.
+
+**Twenty synthetic astrologers, not three.** Building against the three real
+directors is how the interesting bugs get missed: availability collisions, an
+admin list with a second page, two practitioners free at the same minute, a
+rate that is not round. The negative cases are seeded deliberately — two
+unpublished, one retired — because seeding only the happy path is how the empty
+and error states ship having never been looked at. Every row carries
+`isDevFixture` and a `fixtureDataset`, so cleanup deletes only what that run
+created; "delete where is_dev_fixture" would take another dataset's rows too.

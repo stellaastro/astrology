@@ -10,9 +10,11 @@
  *   - the CI gate (scripts/no-fixtures-in-prod.mjs) refuses to let seed modules
  *     be imported from application code
  *
- * The third control — a boot-time check that refuses to serve if fixture rows
- * appear under a non-development profile — lands with the Astrologer model in
- * Phase 4, because nothing seeded today carries an is_dev_fixture marker.
+ * The third control is the boot-time check (FixtureGuard) that refuses to serve
+ * if fixture rows appear under a non-development profile. It now covers leads
+ * AND astrologers — a fake practitioner on a registered company's live site is
+ * someone attempting to book a person who does not exist, which is the worst
+ * thing seed data can do here.
  *
  * Fixture identities use the reserved +9199999000NN block and example.invalid
  * addresses, which cannot receive mail. A seed that can email a real person is
@@ -20,31 +22,10 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { monotonicFactory } from 'ulid';
+import { seedAstrologers, DATASET } from './astrologers';
+import { assertDevelopment } from './guard';
 
 const nextId = monotonicFactory();
-
-function assertDevelopment(): void {
-  // APP_ENV takes precedence; NODE_ENV is only the fallback when APP_ENV is
-  // unset. An earlier version used
-  //   APP_ENV !== 'development' && NODE_ENV !== 'development'
-  // which let EITHER variable authorise the seed — so APP_ENV=production was
-  // silently ignored while NODE_ENV stayed 'development', which is the normal
-  // state of any Node process. Caught by actually running it, not by reading.
-  const env = process.env.APP_ENV ?? process.env.NODE_ENV ?? 'unset';
-  if (env !== 'development') {
-    throw new Error(
-      `Refusing to seed: APP_ENV/NODE_ENV is "${env ?? 'unset'}", not "development". ` +
-        `Seeds must never run against staging or production (ADR-026).`,
-    );
-  }
-  const url = process.env.DATABASE_URL ?? '';
-  if (!/_dev(\?|$)/.test(url)) {
-    throw new Error(
-      `Refusing to seed: DATABASE_URL does not point at a *_dev database. ` +
-        `Environment separation is the whole control here.`,
-    );
-  }
-}
 
 export async function seed(prisma: PrismaClient): Promise<void> {
   assertDevelopment();
@@ -80,6 +61,9 @@ export async function seed(prisma: PrismaClient): Promise<void> {
   }
 
   console.log(`  seeded ${LEADS} development leads`);
+
+  const astrologers = await seedAstrologers(prisma);
+  console.log(`  seeded ${astrologers} development astrologers (dataset ${DATASET})`);
 }
 
 if (require.main === module) {

@@ -81,6 +81,11 @@ model Lead {
   /// without a column to look at. Production rows are always false.
   isDevFixture Boolean @default(false) @map("is_dev_fixture")
 
+  /// Which seed run created this row (ADR-036). Cleanup deletes by dataset, so
+  /// a reseed can never reach a row it did not create — "delete where
+  /// is_dev_fixture" would happily take someone else's fixtures with it.
+  fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
+
   createdAt DateTime @default(now()) @map("created_at")
 
   /// DPDP access and erasure requests made by this person (ADR-040).
@@ -252,6 +257,11 @@ model User {
 
   sessions Session[]
 
+  /// An astrologer's profile, when this account is one. Optional on both sides:
+  /// profiles are ADMIN-CREATED and exist before the practitioner has ever
+  /// signed in (ADR-043).
+  astrologer Astrologer?
+
   @@index([disabledAt])
   @@map("users")
 }
@@ -287,4 +297,80 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// An astrologer's public profile and commercial terms (ADR-043).
+///
+/// ADMIN-CREATED. There is no self-signup: at a roster of twelve or fewer, a
+/// KYC pipeline costs more than it protects, so a person with admin rights
+/// enters the profile and a human decides when it goes live.
+model Astrologer {
+  id String @id @db.Char(26) // ULID
+
+  /// Linked when the practitioner first signs in. NULL until then, which is the
+  /// normal state for a freshly created profile — the profile is the record,
+  /// the account is just how they reach it.
+  userId String? @unique @map("user_id") @db.Char(26)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Public URL segment. Stable once published: changing it breaks every link
+  /// anyone has shared.
+  slug String @unique @db.VarChar(80)
+
+  /// Devanagari is canonical for display — the brand wheel labels every sign in
+  /// it and none in Western glyphs — with a Latin transliteration alongside so
+  /// the name is addressable in both scripts.
+  nameHi String @map("name_hi") @db.VarChar(120)
+  nameEn String @map("name_en") @db.VarChar(120)
+
+  headline String? @db.VarChar(160)
+  bio      String? @db.Text
+
+  /// An integer, not a string. "20+ years" is a rendering decision, not data,
+  /// and a string here cannot be sorted or validated.
+  experienceYears Int @map("experience_years")
+
+  /// JSON arrays. MySQL has no array type, and join tables for languages and
+  /// specialisations at a roster of twelve would cost more than they explain.
+  /// Revisit when discovery and filtering land — both deferred past first
+  /// revenue, which is exactly when a join table starts paying for itself.
+  languages       Json
+  specialisations Json
+
+  /// INTEGER PAISE. Never rupees, never a float (ADR-019 / common/money.ts).
+  ///
+  /// This is the CURRENT rate and nothing else. A booking freezes its own price
+  /// snapshot at creation and must never read back through this column — a rate
+  /// change would otherwise silently rewrite the price of every past booking
+  /// (§79, Phase 6).
+  sessionRatePaise Int @map("session_rate_paise")
+  sessionMinutes   Int @default(30) @map("session_minutes")
+
+  /// An R2 object key, never a URL. The KYC and media buckets are private and
+  /// links are signed at read time with a short TTL (ADR-042), so storing a URL
+  /// would store something that stops working.
+  photoKey String? @map("photo_key") @db.VarChar(255)
+
+  /// NOTHING IS PUBLIC UNTIL A HUMAN PUBLISHES IT. Public pages are real or
+  /// empty — never an invented practitioner (§13, ADR-036). A synthetic row can
+  /// be published in development and still cannot appear in production, because
+  /// the fixture guard refuses to serve fixtures under a production profile.
+  publishedAt DateTime? @map("published_at")
+
+  /// Retired rather than deleted: past bookings must keep pointing at a real
+  /// row, and financial history is immutable (§79).
+  retiredAt DateTime? @map("retired_at")
+
+  /// Dev fixture marking (ADR-026) and the dataset that created it (ADR-036).
+  isDevFixture   Boolean @default(false) @map("is_dev_fixture")
+  fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([publishedAt])
+  @@index([retiredAt])
+  @@index([isDevFixture])
+  @@index([fixtureDataset])
+  @@map("astrologers")
 }

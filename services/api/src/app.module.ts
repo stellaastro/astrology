@@ -10,6 +10,7 @@ import { HealthController } from './health/health.controller';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { LeadsModule } from './leads/leads.module';
 import { PrivacyModule } from './privacy/privacy.module';
+import { AstrologersModule } from './astrologers/astrologers.module';
 import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
@@ -47,6 +48,7 @@ import { AuthGuard } from './auth/auth.guard';
     CoreModule,
     LeadsModule,
     PrivacyModule,
+    AstrologersModule,
     // Registers the outbox handler that sends waitlist confirmations.
     MailModule,
     // Sessions, password sign-in, and the guard below.

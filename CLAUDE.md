@@ -97,7 +97,7 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 3 — identity. Complete. Phase 4 (astrologer profiles) is next.**
+**Phase 4 — astrologer profiles. Task 4.1 done; 4.2 and 4.3 remain.**
 Build order:
 
 ```
@@ -117,9 +117,24 @@ read and CSV export, **DPDP access and erasure** (ADR-040) and **enforced data
 retention** (ADR-041). 3.1 and 3.4 (Firebase OTP and its rate limiting) are
 **moot, not skipped** — phone OTP was dropped with Firebase in ADR-037.
 
-**Phase 4 needs the synthetic roster first.** Task 1.9 was widened to ~20 dummy
-astrologers with bookings, consultation history and negative cases (ADR-036);
-Phase 4 builds against those, not against the three directors.
+**Phase 4 so far (ADR-043):** the `Astrologer` model, admin create/update/
+publish endpoints, a public roster that is real-or-empty, and the 20-strong
+synthetic roster (task 1.9 as widened). Profiles are **admin-created and draft
+by default** — publishing is a separate, audited decision.
+
+**Still open in Phase 4:**
+
+- **4.2** astrologer surfaces as role-guarded routes in admin-web — availability
+  editor, upcoming bookings, join link. Dropping Flutter removed the astrologer
+  app and nothing replaced it.
+- **4.3** migrate the Phase 2 static astrologer content to real rows. The three
+  directors go in through the same admin screens, **as data, never as code** —
+  and they still need O3 (photographs, credentials, per-session price).
+- **4.4** recruiting. Not engineering; owner action per O5.
+
+**The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
+price snapshot; never read a past booking's price back through
+`astrologers.session_rate_paise` (§79).
 
 **Still open in Phase 2:**
 
