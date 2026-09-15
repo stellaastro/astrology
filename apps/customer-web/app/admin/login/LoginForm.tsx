@@ -104,7 +104,7 @@ export default function LoginForm() {
       <p className={s.or}>or</p>
 
       {/* A link, not a fetch: this is a full redirect to Google and back. */}
-      <a className={s.google} href="/api/v1/auth/google">Sign in with Google</a>
+      <a className={s.google} href="/api/v1/auth/google?next=admin">Sign in with Google</a>
 
       <p className={s.note}>
         A Google account only works here once it has been granted a role.
