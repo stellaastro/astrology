@@ -276,6 +276,9 @@ model User {
   /// roles (ADR-036); there is no separate table.
   bookings Booking[]
 
+  /// What this account has agreed to, and which version of it (ADR-050).
+  policyAcceptances PolicyAcceptance[]
+
   @@index([disabledAt])
   @@index([isDevFixture])
   @@index([fixtureDataset])
@@ -710,4 +713,48 @@ model RecordingAssessment {
 
   @@index([status])
   @@map("recording_assessments")
+}
+
+/// A recorded acceptance of one policy, at one version (ADR-050).
+///
+/// Owner decision, 2026-09-15: the terms are shown as an ITEMISED LIST before
+/// an account is created, and recording is one of the listed points.
+///
+/// A ROW PER POLICY, not a single "accepted the terms" flag. DPDP consent must
+/// be specific, and one boolean covering terms, privacy and being recorded
+/// cannot show which of them a person actually agreed to. It also means a
+/// policy can be revised without re-asking for the others.
+///
+/// The VERSION is the point. "They accepted" is worthless a year later if
+/// nobody can say what the text said; this row plus the archived text is the
+/// whole of the evidence.
+model PolicyAcceptance {
+  id String @id @db.Char(26) // ULID
+
+  userId String @map("user_id") @db.Char(26)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 'terms' · 'privacy' · 'recording'
+  policy String @db.VarChar(32)
+
+  /// The exact version shown. Never a date, never "latest".
+  version String @db.VarChar(32)
+
+  /// FALSE is a refusal and is stored. Someone who declined recording is not
+  /// the same as someone who was never asked, and only one of them is a
+  /// decision that can be relied on.
+  accepted Boolean
+
+  acceptedAt DateTime @map("accepted_at")
+
+  /// Evidence of the circumstances, same as the waitlist consent record.
+  ip        String? @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  /// Set when the person later changes their mind.
+  withdrawnAt DateTime? @map("withdrawn_at")
+
+  @@unique([userId, policy, version])
+  @@index([userId, policy])
+  @@map("policy_acceptances")
 }

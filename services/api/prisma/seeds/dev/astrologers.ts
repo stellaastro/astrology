@@ -34,11 +34,23 @@ const GIVEN = [
   ['मीनाक्षी', 'Meenakshi'], ['नरेश', 'Naresh'], ['ओंकार', 'Omkar'],
   ['प्रीति', 'Preeti'], ['राधिका', 'Radhika'], ['सुरेश', 'Suresh'],
   ['तनुजा', 'Tanuja'], ['उमेश', 'Umesh'],
+  // Widened 2026-09-15. Twenty exercised the states; forty makes the admin
+  // list, the roster page and the scheduling screens behave like real ones
+  // rather than like a demo that fits on a single screen.
+  ['विनोद', 'Vinod'], ['यामिनी', 'Yamini'], ['ज़ुबिन', 'Zubin'],
+  ['अंजलि', 'Anjali'], ['बृजेश', 'Brijesh'], ['चारुलता', 'Charulata'],
+  ['धीरज', 'Dheeraj'], ['एलीना', 'Eleena'], ['फिरोज़', 'Firoz'],
+  ['गिरिजा', 'Girija'], ['हेमा', 'Hema'], ['ईशिता', 'Ishita'],
+  ['जगदीश', 'Jagdish'], ['कीर्ति', 'Kirti'], ['लीला', 'Leela'],
+  ['मनोहर', 'Manohar'], ['नंदिनी', 'Nandini'], ['ओमप्रकाश', 'Omprakash'],
+  ['पल्लवी', 'Pallavi'], ['रमेश', 'Ramesh'],
 ] as const;
 
 const SURNAME = [
   ['वर्मा', 'Verma'], ['गुप्ता', 'Gupta'], ['अय्यर', 'Iyer'],
-  ['देसाई', 'Desai'], ['रेड्डी', 'Reddy'],
+  ['देसाई', 'Desai'], ['रेड्डी', 'Reddy'], ['जोशी', 'Joshi'],
+  ['मिश्रा', 'Mishra'], ['नायर', 'Nair'], ['पटेल', 'Patel'],
+  ['त्रिपाठी', 'Tripathi'], ['बोस', 'Bose'],
 ] as const;
 
 const LANGUAGES = [
@@ -87,6 +99,22 @@ const SHAPES: readonly (readonly { weekday: number; startMinute: number; endMinu
   [3].map((weekday) => ({ weekday, startMinute: 20 * 60, endMinute: 21 * 60 })),
 ] as const;
 
+/**
+ * NOTE ON RESEEDING AFTER CHANGING THE NAME LISTS.
+ *
+ * The upsert is keyed on `slug`, which is DERIVED from the given name and
+ * surname. Widening the surname list on 2026-09-15 changed the derivation, so
+ * the existing twenty no longer matched their new slugs and the reseed added
+ * forty more alongside them — 55 rows instead of 40.
+ *
+ * A seed keyed on derived data does not update in place when the derivation
+ * changes; it accumulates. Clear the dataset first:
+ *
+ *     clearAstrologers(prisma)   // scoped to fixtureDataset, never to
+ *                                // isDevFixture alone
+ *
+ * which is precisely why every fixture row carries a dataset id (ADR-036).
+ */
 export async function seedAstrologers(prisma: PrismaClient): Promise<number> {
   // Guards itself rather than trusting index.ts to have done it. This function
   // is exported, so "the caller checked" is true only until someone imports it
@@ -98,6 +126,7 @@ export async function seedAstrologers(prisma: PrismaClient): Promise<number> {
 
   for (let i = 0; i < GIVEN.length; i++) {
     const given = GIVEN[i]!;
+    // 40 names over 11 surnames: the stride keeps every slug distinct.
     const surname = SURNAME[i % SURNAME.length]!;
     const slug = `${given[1]}-${surname[1]}`.toLowerCase();
 
