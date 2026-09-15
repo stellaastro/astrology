@@ -68,7 +68,7 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 | Modality | **Scheduled appointments.** On-demand sits behind a ≥3-on-duty coverage gate (ADR-021) |
 | Astrology | ProKerala via `AstrologyProvider` interface. Internal engine is a later swap |
 | Realtime | 100ms via `RealtimeProvider`. Not Agora. **Web SDK — mobile-browser WebRTC is untested and spiked in Phase 1** |
-| Storage | Cloudflare R2, S3-compatible, private buckets + signed URLs only |
+| Storage | Cloudflare R2, S3-compatible, private buckets + signed URLs only. **One bucket per job, isolated at the provider, never by prefix** (ADR-042): `stella-kyc` (real KYC, nothing else) · `stella-kyc-dev` (synthetic, every file marked SAMPLE/NOT VALID) · `stella-backups` (dumps, binlogs, encrypted secrets). Two prefixes in one bucket share a blast radius; buckets do not. **Do not add a bucket without adding it to `docs/architecture/R2_BUCKETS.md` first, with a stated purpose** |
 | Recording | Off in V1; seam retained |
 | Locale | Auto-detect, Hindi default in India. **Legal pages stay English** — machine-translated disclosure text is worse than English |
 | Scale | **~12–15 concurrent consultations.** Launch roster is 3, soft-launch gate is 8–12. The old ~50 figure was sized to a roster that does not exist (ADR-008 corrected) |

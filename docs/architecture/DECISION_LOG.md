@@ -1432,3 +1432,48 @@ code change.
 
 **Daily rather than hourly.** This deletes people's records, so an error in a
 horizon should have a day to be noticed rather than an hour.
+
+---
+
+## ADR-042 — R2 bucket layout: KYC is isolated by bucket, not by prefix
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Supplements:** ADR-014 (R2 as
+the object store), ADR-032 (backups), ADR-036 (synthetic data)
+
+**Decision.** Four buckets, each with one job, all private. Full table in
+`docs/architecture/R2_BUCKETS.md`.
+
+- `stella-kyc` — real KYC documents, nothing else
+- `stella-kyc-dev` — synthetic KYC only, every file marked `SAMPLE / NOT VALID`
+- `stella-backups` — dumps, binlogs, the encrypted secrets archive
+- `stellaastro` — pre-existing, empty, unused
+
+**Buckets, not prefixes, and that is the substance of this ADR.** KYC documents
+are the most sensitive data the project will hold: government identity
+documents belonging to real people. Two prefixes inside one bucket share a
+blast radius — any credential that can read the bucket can read both. Separate
+buckets let a token be scoped so the backup job cannot read KYC and the KYC
+path cannot read backups. The isolation has to be something the storage
+provider enforces, not something the code remembers.
+
+**Synthetic KYC gets its own bucket too**, per ADR-036, which already forbade
+putting it in `stella-backups`. A fixture identity document sitting beside a
+real one is how a fixture eventually gets served as real.
+
+**Backups stay on R2.** They were put there by ADR-032, independently of and
+earlier than any KYC work, and the two uses share a provider and nothing else.
+Moving backups off R2 without naming a replacement destination would leave the
+project with no offsite backup — the single largest unmitigated risk the plan
+identified, and the one task 1.4 exists to close.
+
+**Verified, not assumed.** Every bucket refuses an unauthenticated request:
+R2 answers `InvalidArgument / Authorization` with 113 bytes of XML and no
+object data. Checked against a real backup object, not an empty path.
+
+**Known gap, recorded rather than accepted.** Both tokens in `config.txt` are
+admin-level — each can list, create and delete buckets, proven by the fact that
+either can call `ListBuckets`, which an `Object Read & Write` token cannot. So
+the nightly backup currently holds a credential that could delete its own
+bucket and, once KYC exists, read KYC documents. Replacing these with three
+bucket-scoped `Object Read & Write` tokens is an owner action in the Cloudflare
+dashboard and **should happen before the first real KYC document is stored**.
