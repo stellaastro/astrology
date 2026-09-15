@@ -32,7 +32,19 @@ ENV_FILE="${BACKUP_ENV_FILE:-/home/stellaastro/secrets/backup.env}"
 SECRETS_DIR=/home/stellaastro/secrets
 STAMP="$(date -u +%Y%m%d-%H%M%S)"
 WORK="$(mktemp -d /tmp/stella-backup.XXXXXX)"
-trap 'rm -rf "$WORK"' EXIT
+
+# PRIV holds transient files that must NEVER be uploaded — currently the
+# mysqldump client config, which contains the database password in plaintext.
+#
+# This is a separate directory rather than an exclusion in the upload loop for
+# a reason: the loop is `for f in "$WORK"/*`, so anything dropped in WORK ships
+# by default. my.cnf was written there and was uploaded UNENCRYPTED to R2 on
+# every run — while this script's own header warns that a backup of plaintext
+# credentials in object storage is worse than the exposure it protects against.
+# An exclusion list is something the next person forgets to update; a directory
+# that is never read by the uploader cannot be forgotten.
+PRIV="$(mktemp -d /tmp/stella-backup-priv.XXXXXX)"
+trap 'rm -rf "$WORK" "$PRIV"' EXIT
 
 log() { printf '[backup] %s\n' "$*"; }
 die() { printf '[backup] FAILED: %s\n' "$*" >&2; exit 1; }
@@ -56,13 +68,19 @@ S3="aws s3 --endpoint-url $S3_ENDPOINT"
 log "dumping MySQL"
 DB_USER="$(grep -m1 '^MYSQL_DATABASE_USER=' "$SECRETS_DIR/config.txt" | cut -d= -f2- | tr -d '\r\n')"
 DB_PASS="$(grep -m1 '^MYSQL_DATABASE_USER_PWD=' "$SECRETS_DIR/config.txt" | cut -d= -f2- | tr -d '\r\n')"
-DUMP_CNF="$WORK/my.cnf"; umask 077
+DUMP_CNF="$PRIV/my.cnf"; umask 077
 printf '[client]\nhost=127.0.0.1\nuser=%s\npassword=%s\n' "$DB_USER" "$DB_PASS" > "$DUMP_CNF"
 
 # --single-transaction: a consistent snapshot without locking the tables, so a
 # booking mid-flight is not blocked by the backup.
+# --no-tablespaces: without it mysqldump reads INFORMATION_SCHEMA.FILES and
+# prints "you need the PROCESS privilege" on every run. The app user does not
+# have PROCESS and should not be granted it just to take a backup. Tablespace
+# metadata is irrelevant to a logical restore of InnoDB tables — but a warning
+# printed nightly is a warning nobody reads, and that is how a real error gets
+# missed later.
 mysqldump --defaults-extra-file="$DUMP_CNF" \
-  --single-transaction --quick --routines --triggers --events \
+  --single-transaction --quick --routines --triggers --events --no-tablespaces \
   --databases stellaastro stellaastro_dev \
   | gzip -9 > "$WORK/mysql-$STAMP.sql.gz" || die "mysqldump failed"
 

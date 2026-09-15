@@ -61,34 +61,90 @@ CNF="$WORK/my.cnf"; umask 077
 printf '[client]\nhost=127.0.0.1\nuser=root\npassword=%s\n' \
   "$(clpctl db:show:master-credentials | awk -F'|' '/Password/{gsub(/ /,"",$3); print $3}')" > "$CNF"
 
-log "restoring into $SCRATCH_DB"
-mysql --defaults-extra-file="$CNF" -e "DROP DATABASE IF EXISTS \`$SCRATCH_DB\`; CREATE DATABASE \`$SCRATCH_DB\` CHARACTER SET utf8mb4;"
-# The dump contains CREATE DATABASE for the originals; strip those so
-# everything lands in the scratch database instead.
-gunzip -c "$WORK/dump.sql.gz" \
-  | sed -E '/^(CREATE DATABASE|USE )/d' \
-  | mysql --defaults-extra-file="$CNF" "$SCRATCH_DB" || die "restore failed"
+# Each source database is restored into its OWN scratch database and compared
+# against itself.
+#
+# THIS IS A FIX, NOT A REFACTOR. The previous version stripped every
+# `CREATE DATABASE` and `USE` line and piped the whole dump into one scratch
+# database. That is safe — production is never written to — but the dump holds
+# BOTH databases, and mysqldump emits `DROP TABLE IF EXISTS` before each table.
+# So the second database silently dropped and replaced the first, and the
+# scratch database ended up holding only whichever was dumped last.
+#
+# The comparison then hardcoded stellaastro_dev as "live", so the counts
+# matched, and the script printed "the backup is real" while the PRODUCTION
+# database had never been restore-tested at all. A rehearsal that cannot fail
+# for the thing it is rehearsing is worse than none, because it is believed.
+restore_one() {
+  local SRC="$1" DST="$1_restore_check"
+
+  case "$DST" in
+    *_restore_check) : ;;
+    *) die "refusing to restore into $DST — target must end in _restore_check" ;;
+  esac
+
+  log "restoring $SRC into $DST"
+  mysql --defaults-extra-file="$CNF" \
+    -e "DROP DATABASE IF EXISTS \`$DST\`; CREATE DATABASE \`$DST\` CHARACTER SET utf8mb4;"
+
+  # Keep the dump preamble (charset and session SETs, which the data depends
+  # on), then only the section belonging to SRC. Dropping CREATE DATABASE/USE
+  # is what redirects it into the scratch database named on the mysql command.
+  gunzip -c "$WORK/dump.sql.gz" \
+    | awk -v db="$SRC" '
+        BEGIN { pre = 1; inblk = 0 }
+        /^CREATE DATABASE/ { pre = 0; next }
+        /^USE `/           { pre = 0; inblk = ($0 == "USE `" db "`;"); next }
+        { if (pre || inblk) print }
+      ' \
+    | mysql --defaults-extra-file="$CNF" "$DST" || die "restore of $SRC failed"
+}
+
+compare_one() {
+  local SRC="$1" DST="$1_restore_check"
+  local TABLES
+  # Compare every table the SOURCE has, not a hardcoded list — a new table that
+  # never reaches the backup is exactly what this should catch.
+  TABLES=$(mysql --defaults-extra-file="$CNF" -N -B "$SRC" \
+    -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$SRC' AND table_type='BASE TABLE'" 2>/dev/null)
+
+  [ -n "$TABLES" ] || { printf '  %s: no tables found in the live database\n' "$SRC"; return; }
+
+  printf '  %s\n' "$SRC"
+  for T in $TABLES; do
+    LIVE=$(mysql --defaults-extra-file="$CNF" -N -B "$SRC" -e "SELECT COUNT(*) FROM \`$T\`" 2>/dev/null || echo 0)
+    REST=$(mysql --defaults-extra-file="$CNF" -N -B "$DST" -e "SELECT COUNT(*) FROM \`$T\`" 2>/dev/null || echo MISSING)
+    if [ "$REST" = "MISSING" ]; then
+      printf '    %-22s live=%-6s restored=MISSING  <-- TABLE ABSENT\n' "$T" "$LIVE"; FAIL=1
+    elif [ "$LIVE" != "$REST" ]; then
+      printf '    %-22s live=%-6s restored=%-6s  <-- MISMATCH\n' "$T" "$LIVE" "$REST"; FAIL=1
+    else
+      printf '    %-22s live=%-6s restored=%-6s  ok\n' "$T" "$LIVE" "$REST"
+    fi
+  done
+}
+
+FAIL=0
+# stellaastro is PRODUCTION and is listed first deliberately: it is the one
+# whose recovery actually matters.
+for DB in stellaastro stellaastro_dev; do
+  restore_one "$DB"
+done
 
 log "comparing row counts against live"
-FAIL=0
-for T in leads audit_events idempotency_keys outbox_messages; do
-  LIVE=$(mysql --defaults-extra-file="$CNF" -N -B stellaastro_dev -e "SELECT COUNT(*) FROM \`$T\`" 2>/dev/null || echo 0)
-  REST=$(mysql --defaults-extra-file="$CNF" -N -B "$SCRATCH_DB" -e "SELECT COUNT(*) FROM \`$T\`" 2>/dev/null || echo MISSING)
-  if [ "$REST" = "MISSING" ]; then
-    printf '  %-20s live=%-6s restored=MISSING  <-- TABLE ABSENT\n' "$T" "$LIVE"; FAIL=1
-  elif [ "$LIVE" -gt 0 ] && [ "$REST" -eq 0 ]; then
-    printf '  %-20s live=%-6s restored=%-6s  <-- EMPTY\n' "$T" "$LIVE" "$REST"; FAIL=1
-  else
-    printf '  %-20s live=%-6s restored=%-6s  ok\n' "$T" "$LIVE" "$REST"
-  fi
+for DB in stellaastro stellaastro_dev; do
+  compare_one "$DB"
 done
 
 # Devanagari must survive the round trip, or the backup is subtly corrupt in a
 # way row counts would not reveal.
-mysql --defaults-extra-file="$CNF" -N -B "$SCRATCH_DB" \
+mysql --defaults-extra-file="$CNF" -N -B "stellaastro_restore_check" \
   -e "SELECT 'शिवपाल' = CONVERT('शिवपाल' USING utf8mb4)" >/dev/null 2>&1 \
   && log "utf8mb4 round trip ok" || { log "WARNING: charset check failed"; FAIL=1; }
 
-mysql --defaults-extra-file="$CNF" -e "DROP DATABASE \`$SCRATCH_DB\`;"
+for DB in stellaastro stellaastro_dev; do
+  mysql --defaults-extra-file="$CNF" -e "DROP DATABASE IF EXISTS \`${DB}_restore_check\`;"
+done
+
 [ "$FAIL" -eq 0 ] || die "restore verification found problems"
 log "restore verified — the backup is real"
