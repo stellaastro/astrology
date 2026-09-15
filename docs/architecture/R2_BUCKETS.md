@@ -12,6 +12,7 @@ Objects are reached with signed requests only (CLAUDE.md, Storage).
 |---|---|---|---|
 | `stella-kyc` | **Customer and astrologer KYC documents.** Nothing else | The API, Phase 9+ | Created, empty |
 | `stella-kyc-dev` | **Synthetic** KYC only — every file visibly marked `SAMPLE / NOT VALID` (ADR-036) | Dev seeds | Created, empty |
+| `stella-recordings` | **Consultation audio** (ADR-048). 30-day expiry enforced by R2 itself, not by a job | 100ms, Phase 8 | Created, empty |
 | `stella-backups` | Nightly MySQL dumps, binlogs, the encrypted secrets archive | `infrastructure/backup/backup.sh` | **In use** |
 | `stellaastro` | Nothing. Pre-existing, empty | — | Unused — see below |
 
@@ -58,6 +59,7 @@ bucket it writes to, and — once KYC exists — could read KYC documents.
 | Consumer | Token | Scope |
 |---|---|---|
 | `backup.sh` | Object Read & Write | `stella-backups` only |
+| 100ms recording | Object Read & Write | `stella-recordings` only |
 | The API (Phase 9+) | Object Read & Write | `stella-kyc` only |
 | Dev seeds | Object Read & Write | `stella-kyc-dev` only |
 

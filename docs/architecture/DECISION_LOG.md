@@ -1791,3 +1791,96 @@ begin with a digit** — POSIX shells reject `100MS_APP_KEY=x` outright. They ar
 mobile Safari or Chrome on a real handset on Indian 4G, and the entire web-only
 decision rests on it. Credentials working is not the same as WebRTC working on
 the target network. That needs physical devices and remains an owner action.
+
+---
+
+## ADR-048 — Recorded audio consultations: consent first, machines advise
+
+**Date:** 2026-09-15 · **Status:** Accepted in principle, **blocked on two owner
+decisions** · **Supersedes:** ADR-015's "recording off in V1"
+
+**Owner decision, 2026-09-15.** Consultations are audio-only, recorded, kept for
+one month, screened for abusive language, and assessed — with the outcome
+reported to the admin and the astrologer.
+
+This reverses ADR-015. That is the owner's call. What follows is what has to be
+true for it to be lawful and useful rather than a liability.
+
+### Already true
+
+**Audio-only needs no work.** The 100ms template publishes `audio` and `screen`;
+no role can publish video. Checked against the live template, not assumed.
+
+**Storage is built.** `stella-recordings` is a private R2 bucket with an
+**R2-enforced 30-day expiration rule** — deletion by the storage provider, not
+by a job we have to remember to run. Verified by reading the rule back and by
+confirming an unauthenticated request returns an error document rather than a
+listing. Its own bucket, separate from KYC and backups, so a token scoped to
+one cannot read the others (ADR-042).
+
+### Blocking: consent
+
+**A recording taken without consent is a liability, not an asset.** Under the
+DPDP Act a voice recording is personal data, and consultation audio is the most
+sensitive kind this business will ever hold — people tell astrologers about
+their health, their marriages and their money. Consent must be free, specific,
+informed, unambiguous, and withdrawable.
+
+So, before any recording is enabled:
+
+1. **Both parties are told, every time, before the recording starts** — the
+   customer and the astrologer. Not a line in a policy nobody opens.
+2. **Consent is a stored artifact with a policy version and a timestamp**, the
+   same shape as `leads.consent_at` / `consent_policy_version`. "They agreed"
+   without a record of what they agreed to is not consent.
+3. **Refusal is possible and does not cancel the consultation.** A consent that
+   cannot be declined is not consent; if recording is a condition of service,
+   that has to be stated plainly at booking, and it is a business decision, not
+   an engineering one.
+4. **Withdrawal deletes the recording**, and the DPDP erasure path
+   (ADR-040) must reach recordings, not just the lead row.
+
+**Owner action:** the consent wording, and whether a customer may decline and
+still be seen.
+
+### Blocking: what a machine may conclude about a person
+
+Abuse screening and "grading the talk" are judgments about named people — three
+of whom are the company's own directors. Two rules, and they are not
+negotiable engineering preferences:
+
+**1. A machine output is a FLAG FOR A HUMAN, never a finding.** Automated
+speech analysis on Hindi and regional languages, over astrology vocabulary, will
+produce false positives. Telling an astrologer that software judged them abusive
+is defamatory when it is wrong, and it will sometimes be wrong. Nothing reaches
+the astrologer until a named person has listened and decided.
+
+**2. The reviewer cannot be the subject.** At a roster of three, the astrologer
+being assessed is also the person who would review the assessment. This is the
+same four-eyes gap the plan already records for no-show adjudication (task 6.9,
+owner action O5), and it is unresolved.
+
+A "grade" delivered automatically to an astrologer's screen is an algorithmic
+judgment about someone's livelihood. It may be computed; it may not be
+published without review.
+
+**Owner action:** who reviews flagged calls, given they cannot be the astrologer
+concerned.
+
+### Also required, and not yet built
+
+- **A processor agreement** with whoever transcribes the audio. Sending
+  consultation recordings to a third party is a further disclosure and needs its
+  own consent line and a DPA. Choosing that vendor is not an engineering
+  decision.
+- **Recording is a paid 100ms feature** and the template has none configured
+  (`recording: {}`, `destinations.browserRecordings: {}`). Whether the plan
+  includes it is an account question.
+- **Access to recordings is audited** like every admin read of lead data
+  (ADR-031), and the audit must record who listened to whose consultation.
+
+### What is NOT deferred
+
+The bucket, its 30-day enforced expiry, and its isolation exist now, because
+they are the parts that are dangerous to add late: a recording written to the
+wrong bucket, or with no expiry, is one that outlives its lawful basis.
