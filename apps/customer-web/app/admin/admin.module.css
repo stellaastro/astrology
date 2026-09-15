@@ -1,0 +1,96 @@
+/* Admin surfaces. Same tokens as the public site (ADR-002) — one design
+   system with two value maps, not a second design system. */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+.signout {
+  min-height: var(--tap);
+  padding: 0 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.signout:hover:not(:disabled) { background: var(--cream); }
+.signout:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.summary { margin: var(--s3) 0; color: var(--ink-soft); font-size: var(--step--1); }
+.export { margin-left: .4rem; }
+
+.empty {
+  margin: var(--s4) 0;
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+}
+
+/* A table is the right shape for this data. It scrolls inside its own box so
+   the PAGE never scrolls sideways. */
+.scroll { overflow-x: auto; margin-top: var(--s3); }
+
+.table { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+
+.table th,
+.table td {
+  padding: var(--s2) var(--s2) var(--s2) 0;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+.table th {
+  font-weight: 400;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: .68rem;
+}
+
+.table td:first-child { white-space: normal; word-break: break-word; }
+
+.ok { color: var(--leaf); }
+.pending { color: var(--ink-soft); }
+
+/* Sample rows must be unmistakable. A fixture that reads as a real signup is
+   how a fake number ends up in a report (ADR-036). */
+.fixture {
+  margin-left: .5rem;
+  padding: .1rem .4rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  font-size: .62rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s4);
+  font-size: var(--step--1);
+}
+
+.pager a { display: inline-flex; align-items: center; min-height: var(--tap); }
+.pager span { color: var(--ink-soft); }
+
+.note {
+  max-width: 52ch;
+  margin: var(--s5) 0 0;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}

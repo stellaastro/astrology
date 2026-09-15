@@ -12,6 +12,7 @@
  */
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import s from './SiteNav.module.css';
 
@@ -24,6 +25,7 @@ const ITEMS: ReadonlyArray<readonly [string, string, string]> = [
 
 export default function SiteNav() {
   const [active, setActive] = useState<string>('');
+  const pathname = usePathname();
 
   /* Marks whichever section is in view. IntersectionObserver rather than a
      scroll handler, so this costs nothing per frame. */
@@ -49,6 +51,12 @@ export default function SiteNav() {
     nodes.forEach((n) => io.observe(n));
     return () => io.disconnect();
   }, []);
+
+  /* Admin surfaces are an internal tool, not the marketing site. Astrologers,
+     How it works and Join the waitlist are noise there — and a "Join the
+     waitlist" button on a sign-in page invites a misclick. The brand link in
+     the header still gets you home. */
+  if (pathname?.startsWith('/admin')) return null;
 
   const isCurrent = (href: string) => href.endsWith(active) && active !== '';
 
