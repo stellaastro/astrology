@@ -1734,3 +1734,60 @@ most likely launch incident.
 **Not yet built:** the booking service itself, reschedule (6.6), the overrun
 policy (6.7), the reaper (6.10). 6.8 needs 100ms (Phase 8), 6.9 needs a second
 admin (O5), 6.11 needs TRAI DLT.
+
+---
+
+## ADR-047 — 100ms: a room per consultation, tokens minted per request
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Implements:** ADR-005's seam
+
+**Decision.** `RealtimeProvider` is the seam; `HmsService` is the 100ms
+implementation. Booking and consultation code never names the vendor.
+
+**Verified against the live API**, not reasoned about: a room is created, join
+tokens are minted for both sides, and the room is disabled again. The account's
+credentials work.
+
+### Three things the existing account setup got wrong
+
+**1. One shared room.** The account had a single room, and its id was in
+`config.txt`. A consultation marketplace needs **a room per booking**: with one
+room, two concurrent consultations put four people in the same call. A customer
+would hear someone else's reading — a privacy breach and the most embarrassing
+possible bug. `createRoom` is called per consultation and the shared room id is
+deliberately **not** copied into the API environment.
+
+**2. The stored token had already expired** — `100MS_TOKEN` was a management
+token that lapsed on 2026-09-12 and could not have worked. Tokens are now minted
+per request from the app key and secret. A long-lived token sitting in a config
+file has no revocation story.
+
+**3. The template is a demo.** `AR-noisy-cake-417467` ships with the default
+100ms roles — `listener`, `moderator`, `speaker`. **A `listener` cannot speak**,
+so a customer given that role would sit mute through a reading they paid for.
+Both sides therefore default to `speaker`, and the mapping is environment-driven
+(`HMS_ROLE_ASTROLOGER`, `HMS_ROLE_CUSTOMER`) so a proper template can be adopted
+without a code change. **Owner action: create a template with roles that mean
+something here.**
+
+### The app secret never leaves the server
+
+It can mint a *moderator* token for any room on the account. The browser
+receives only a short-lived token scoped to one room, one user and one role.
+There is a test asserting the secret does not appear in a minted token, and it
+was confirmed to fail when a secret is deliberately added to the payload.
+
+Join tokens last four hours — long enough for a consultation plus a reconnect,
+short enough that a leaked link stops working the same day.
+
+### A naming trap worth recording
+
+The credentials are `100MS_*` in `config.txt`, and **a variable name cannot
+begin with a digit** — POSIX shells reject `100MS_APP_KEY=x` outright. They are
+`HMS_*` in every environment file. This is also why a scan of `config.txt` for
+`^[A-Za-z_]` missed the whole section.
+
+**Still not done: the Phase 1 spike (task 1.5).** 100ms has never been tested in
+mobile Safari or Chrome on a real handset on Indian 4G, and the entire web-only
+decision rests on it. Credentials working is not the same as WebRTC working on
+the target network. That needs physical devices and remains an owner action.
