@@ -58,7 +58,7 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 | CTA | Terracotta `#A94424` on ivory `#FFF8E8` (5.61:1). On lotus cream it is **4.61:1** — AA by 0.11, and the lint guards that pair |
 | Type | **Serif display, sans body** (ADR-035): Cormorant Garamond (Latin headings) · Tiro Devanagari Hindi (Devanagari headings) · **Mukta** (all body and UI, covers both scripts). Inter still rejected — no Devanagari coverage |
 | Dev data | **Fully synthetic roster** in dev and staging — astrologers, customers, bookings, KYC (ADR-036). Production public pages are **real or empty**, never invented practitioners |
-| Auth | **Google sign-in for customers** (ADR-037) — phone OTP dropped, Firebase dropped with it. **Admin is one account, `admin@stellaastro.com`, password only** (ADR-038) — owner decision, supersedes ADR-018's MFA requirement; revisit before Phase 7 |
+| Auth | **Google sign-in for customers** (ADR-037) — phone OTP dropped, Firebase dropped with it. **Two admin identities** (ADR-038): `guruji@stellaastro.com` via Google, which carries Google's own 2FA and is the **preferred** route; `admin@stellaastro.com` password-only as **break-glass**. ADR-018's MFA requirement is still superseded, not met — the single-factor path stays open. Revisit before Phase 7. **Grant roles with `grant-role.ts`, never by hand-written SQL** — the CLI writes the audit row |
 | Sessions | **Server-side rows**, not signed tokens (ADR-039). Revocation must be a lookup the server can change. The guard denies by default — a route is public only if it says `@Public()` |
 | Backend | NestJS + TypeScript. Not FastAPI, not Pydantic |
 | Web | Next.js (customer + admin). Admin is a role-guarded route group, not a separate app |

@@ -1295,6 +1295,30 @@ shipping. **ADR-018's MFA requirement is superseded, not met.**
 **Revisit before Phase 7.** Once real money moves, one factor on the account
 that approves refunds should be reconsidered.
 
+### Amendment, 2026-09-15 — a second factor now exists, without TOTP
+
+`guruji@stellaastro.com` has been granted `admin:super`. It signs in through
+Google (ADR-037), which already carries the owner's own 2FA, so **the admin
+surface is now reachable by a path that has a second factor** — obtained at no
+cost and with no TOTP app to manage.
+
+**This does not retract the decision above; it narrows it.** The password
+account is unchanged and still single-factor, and `admin@stellaastro.com` is
+deliberately kept as the **break-glass route** for the case where Google is
+unavailable or the account is locked out of it. ADR-018 is still superseded
+rather than met, because the weaker path remains open and nothing forces the
+stronger one.
+
+**So the Phase 7 revisit stands, and it is now a smaller question:** not "how do
+we add MFA" but "do we close or further restrict the password path once real
+money moves". Closing it entirely trades one risk for another — a sole
+dependency on Google for administrative access — which is why it is a decision
+for that point and not this one.
+
+The grant was made with `services/api/src/auth/cli/grant-role.ts`, which writes
+an audit row carrying the before and after role sets. A privilege change that
+leaves no trace is exactly the kind an investigation needs and cannot find.
+
 ---
 
 ## ADR-039 — Sessions are rows, not self-contained tokens
