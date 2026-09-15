@@ -30,10 +30,11 @@
     ".next-release-hero-viewport/types/**/*.ts",
     ".next-release-hero/types/**/*.ts",
     ".next-release-phase2/types/**/*.ts",
+    ".next-release-privacy/types/**/*.ts",
     ".next-release-signin/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-release-privacy/types/**/*.ts"
+    ".next-release-astrologers/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import SignOut from './SignOut';
+import AdminNav from './AdminNav';
 import s from './admin.module.css';
 
 /**
@@ -96,6 +97,9 @@ export default async function AdminPage({
             </div>
             <SignOut />
           </div>
+          {/* Without this the waitlist is a dead end: the astrologers screen
+              exists but nothing links to it. */}
+          <AdminNav />
         </div>
       </div>
 
