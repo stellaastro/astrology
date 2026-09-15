@@ -90,7 +90,7 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 0 — documentation, in progress.** The plan is approved. Build order:
+**Phase 2 — public entry. Substantially complete; Phase 3 is next.** Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -98,15 +98,29 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 8 Consultation = FIRST REVENUE
 ```
 
-Two things to know before touching anything:
+**Done:** Phase 1 in full. Phase 2's landing page (six sections), waitlist
+endpoint, double opt-in with a real confirmation email, `/confirm`, navigation
+with a mobile sticky bar, and the accessibility pass. The site is live and the
+waitlist works end to end.
 
-1. **Six owner actions block everything**, none of them engineering — credential
-   rotation, the paying-clients question, directors' photos and pricing, the
-   refund policy, a non-astrologer admin, and two outside questions (Razorpay
-   category, GST principal-versus-agent). See §1 of the plan.
-2. **In Phase 2 the three astrologers are static page content, not database
-   rows.** They become real rows in Phase 4. Do not build a schema for them
-   early.
+**Still open in Phase 2:**
+
+- **2.8 legal pages — PARKED by the owner.** This is the Razorpay unblocker, and
+  it needs CIN (`U96906MP2026PTC085281`), GSTIN, the registered office, a
+  grievance officer, and the O4 refund policy. Do not write any of it from
+  invention.
+- 2.14 referral codes · 2.15 a real transactional email provider · 2.16 signup
+  counters. All P2.
+
+**Two operational facts that bite:**
+
+1. **Deploying the web app means building a NEW release directory** and pointing
+   `NEXT_DIST_DIR` at it in the `stella-web` systemd drop-in. Building
+   `.next-prod` alone changes nothing that is served.
+2. **The API's production environment comes from
+   `/home/stellaastro/secrets/api.production.env`**, not the repo `.env` — which
+   is the development default and points at `stellaastro_dev`. See
+   `infrastructure/api-production/README.md`.
 
 Free tools (Kundli, horoscope, panchang) are **deferred past first revenue** —
 they are acquisition infrastructure for a scale that does not exist at roster 3.

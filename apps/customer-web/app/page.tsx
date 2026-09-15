@@ -30,6 +30,91 @@ export default function Home() {
     <>
       <StellaHero />
 
+      {/* Billing terms. Gold-ruled STACKED ROWS, not a three-column feature
+          grid — DESIGN.md §5 names that grid as the single most recognisable
+          AI-generated layout.
+
+          Everything here is settled architecture (ADR-023 pay-at-booking,
+          ADR-024 slot-based). What is deliberately absent is the price and the
+          refund policy: those are owner decisions (O3, O4) and inventing either
+          is exactly what §13 forbids. */}
+      <section id="terms">
+        <div className="wrap">
+          <div className="sechead">
+            <h2>शुल्क कैसे लगेगा</h2>
+            <p lang="en">
+              How charging will work when bookings open. No hidden meter, and
+              nothing starts without you choosing it.
+            </p>
+          </div>
+
+          <dl className="terms">
+            <div className="term">
+              <dt lang="en">You book a slot, not minutes</dt>
+              <dd lang="en">
+                A thirty-minute appointment is charged as a thirty-minute
+                appointment. There is no per-minute timer running while you
+                think, and no charge for a pause in the conversation.
+              </dd>
+            </div>
+            <div className="term">
+              <dt lang="en">You pay when you book</dt>
+              <dd lang="en">
+                The full amount is taken at the time you reserve the slot, so
+                nothing is owed afterwards and there is no balance to top up.
+              </dd>
+            </div>
+            <div className="term">
+              <dt lang="en">You see the price before you pay</dt>
+              <dd lang="en">
+                The astrologer, the time and the amount are all shown on the
+                booking screen. Prices are not published yet because bookings
+                are not open yet.
+              </dd>
+            </div>
+            <div className="term">
+              <dt lang="en">Cancellations</dt>
+              <dd lang="en">
+                The cancellation and refund terms are still being settled, and
+                they will be published here in full before the first booking is
+                taken. We would rather leave this blank than guess at it.
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      {/* How it works. Four steps, same stacked-row treatment. */}
+      <section id="how">
+        <div className="wrap">
+          <div className="sechead">
+            <h2>यह कैसे काम करेगा</h2>
+            <p lang="en">
+              Scheduled appointments with a named person — not a queue, and not
+              whoever happens to be free.
+            </p>
+          </div>
+
+          <ol className="steps">
+            <li lang="en">
+              <b>Choose your astrologer.</b> Each one is named, with their
+              experience and the languages they speak.
+            </li>
+            <li lang="en">
+              <b>Pick a time that suits you.</b> You see their actual
+              availability and choose a slot, rather than waiting for a callback.
+            </li>
+            <li lang="en">
+              <b>Pay for that slot.</b> The amount is shown before you confirm.
+            </li>
+            <li lang="en">
+              <b>Speak at the appointed time.</b> The consultation happens in
+              your browser — nothing to install.
+            </li>
+          </ol>
+        </div>
+      </section>
+
       <section id="astrologers">
         <div className="wrap">
           <div className="sechead">

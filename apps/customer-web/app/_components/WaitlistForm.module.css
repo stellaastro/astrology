@@ -48,15 +48,19 @@
   color: var(--ink-soft);
 }
 
-/* The box is small, but its hit area is not: the label is clickable and the
-   row is tall enough to hit on a phone. */
-.consent label { cursor: pointer; padding-block: .35rem; }
+/* The whole row is the target, not just the box. The label is clickable and
+   padded so the combined hit area clears 44px even though the control itself
+   is smaller — a 44px checkbox glyph would look like a mistake. */
+.consent { min-height: var(--tap); }
+.consent label { cursor: pointer; padding-block: .6rem; }
 
 .check {
   flex: none;
-  width: 20px;
-  height: 20px;
-  margin-top: .45rem;
+  /* 24px is the WCAG 2.2 minimum for a control; the row above supplies the
+     rest of the 44px target. */
+  width: 24px;
+  height: 24px;
+  margin-top: .55rem;
   accent-color: var(--cta);
 }
 
