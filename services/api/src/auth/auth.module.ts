@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { SessionService } from './session.service';
+import { GoogleService } from './google.service';
 
 /**
  * Global so AuthGuard can be applied app-wide without every module importing
@@ -12,7 +13,7 @@ import { SessionService } from './session.service';
 @Global()
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, SessionService, AuthGuard],
-  exports: [AuthService, SessionService, AuthGuard],
+  providers: [AuthService, SessionService, AuthGuard, GoogleService],
+  exports: [AuthService, SessionService, AuthGuard, GoogleService],
 })
 export class AuthModule {}

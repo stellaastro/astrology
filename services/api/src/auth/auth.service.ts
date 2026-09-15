@@ -3,6 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SessionService } from './session.service';
 import { hashPassword, needsRehash, verifyPassword } from './password';
+import { monotonicFactory } from 'ulid';
+import type { GoogleIdentity } from './google.service';
+
+const ulid = monotonicFactory();
 
 /** Failures before the account locks, and for how long. */
 const MAX_FAILED = 5;
@@ -92,6 +96,78 @@ export class AuthService {
 
     const { token, expiresAt } = await this.sessions.create(user.id, ctx);
     await this.record(user.id, 'auth.login.success', ctx, normalised);
+
+    return {
+      token,
+      expiresAt,
+      user: {
+        id: user.id,
+        email: user.email,
+        roles: Array.isArray(user.roles) ? (user.roles as string[]) : [],
+      },
+    };
+  }
+
+  /**
+   * Signs in with a verified Google identity, creating the account on first
+   * sight (ADR-037).
+   *
+   * MATCHED BY google_sub FIRST, email second. Google's `sub` is stable; an
+   * email address is not — people change them, and addresses get reassigned
+   * inside a workspace. Matching on email alone would hand an account to
+   * whoever inherits the address.
+   *
+   * When an existing password account signs in with the same address, the two
+   * are linked rather than duplicated: one identity per human keeps the audit
+   * trail answerable (ADR-018).
+   */
+  async loginWithGoogle(
+    identity: GoogleIdentity,
+    ctx: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<{ token: string; expiresAt: Date; user: { id: string; email: string; roles: string[] } }> {
+    let user = await this.prisma.user.findUnique({ where: { googleSub: identity.sub } });
+
+    if (!user) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email: identity.email } });
+      if (byEmail) {
+        if (byEmail.googleSub && byEmail.googleSub !== identity.sub) {
+          // Two Google accounts claiming one address. Refuse rather than guess.
+          await this.record(byEmail.id, 'auth.google.conflict', ctx, identity.email);
+          throw new UnauthorizedException('Could not complete Google sign-in.');
+        }
+        user = await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { googleSub: identity.sub, name: byEmail.name ?? identity.name ?? null },
+        });
+        await this.record(user.id, 'auth.google.linked', ctx, identity.email);
+      } else {
+        user = await this.prisma.user.create({
+          data: {
+            id: ulid(),
+            email: identity.email,
+            name: identity.name ?? null,
+            googleSub: identity.sub,
+            // A new Google account is a customer. Roles are granted
+            // deliberately, never inferred from how someone signed in.
+            roles: [],
+          },
+        });
+        await this.record(user.id, 'auth.google.signup', ctx, identity.email);
+      }
+    }
+
+    if (user.disabledAt) {
+      await this.record(user.id, 'auth.google.disabled', ctx, identity.email);
+      throw new UnauthorizedException('Could not complete Google sign-in.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const { token, expiresAt } = await this.sessions.create(user.id, ctx);
+    await this.record(user.id, 'auth.google.success', ctx, identity.email);
 
     return {
       token,
