@@ -17,6 +17,7 @@
  */
 
 import StellaHero from './_components/StellaHero';
+import WaitlistForm from './_components/WaitlistForm';
 
 const ASTROLOGERS = [
   { hi: 'शिवपाल सिंह', en: 'Shivpal Singh', role: 'Executive Director' },
@@ -51,6 +52,22 @@ export default function Home() {
               </div>
             </article>
           ))}
+        </div>
+      </section>
+
+      {/* The waitlist. This is the one thing the page can actually DO today —
+          the endpoint is live and the confirmation email really sends. */}
+      <section id="waitlist">
+        <div className="wrap">
+          <div className="sechead">
+            <h2>प्रतीक्षा सूची में शामिल हों</h2>
+            <p lang="en">
+              Bookings are not open yet. Leave your email and we will write to
+              you once you can choose a time with one of our astrologers — and
+              not for any other reason.
+            </p>
+          </div>
+          <WaitlistForm />
         </div>
       </section>
     </>
