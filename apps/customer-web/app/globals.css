@@ -183,6 +183,14 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
    been failing AA silently since it was written. --dark-muted is 6.33:1 and
    the lint now checks it. */
 .legal { margin-top: var(--s3); line-height: 1.9; color: var(--dark-muted); }
+/* DESIGN.md §3: 44px minimum applies to inline text links in the footer too.
+   inline-flex rather than padding, so the line box does not grow and open a
+   gap in the surrounding sentence. */
+.legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+}
 
 @media (max-width: 860px) {
   .person { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }
@@ -200,3 +208,58 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
   border: 1px solid var(--rule);
 }
 .skip:focus-visible { left: var(--s3); top: var(--s2); }
+
+/* ── Billing terms and steps ──────────────────────────────────────
+   Gold-ruled STACKED ROWS, label left and description right. DESIGN.md §5
+   names the three-column icon/title/description grid as the single most
+   recognisable AI-generated layout, so it is not used here. */
+.terms { margin: 0; }
+.term {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) 1fr;
+  gap: var(--s3);
+  padding-block: var(--s3);
+  border-top: 1px solid var(--rule);
+}
+.term dt {
+  font-family: var(--font-display-lat);
+  font-size: var(--step-2);
+  line-height: 1.25;
+}
+.term dd { margin: 0; color: var(--ink-soft); }
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: var(--s3);
+  padding-block: var(--s3);
+  border-top: 1px solid var(--rule);
+  color: var(--ink-soft);
+}
+.steps li::before {
+  content: counter(step, decimal-leading-zero);
+  font-family: var(--font-display-lat);
+  font-size: var(--step-2);
+  color: var(--ink-soft);   /* gold would be 2.31:1 — never text */
+  line-height: 1.25;
+}
+.steps b { font-weight: 400; color: var(--ink); }
+
+@media (max-width: 860px) {
+  .term { grid-template-columns: 1fr; gap: var(--s1); }
+  .steps li { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }
+}
+
+/* The mobile nav bar is fixed over the page, so the footer needs room to clear
+   it or its last line sits underneath permanently. Lives here rather than in
+   SiteNav.module.css: CSS Modules rejects a bare element selector. */
+@media (max-width: 860px) {
+  footer { padding-bottom: calc(var(--s5) + 64px); }
+}

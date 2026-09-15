@@ -1,3 +1,5 @@
+import SiteNav from './SiteNav';
+
 /**
  * Header and footer, shared by every route.
  *
@@ -6,9 +8,9 @@
  * is the point: the entity name, the grievance route and the
  * no-professional-advice disclaimer are not optional per-page decorations.
  *
- * There is deliberately NO navigation menu. Only two routes exist — / and
- * /kundli — and links to Horoscope, Panchang or Services would resolve to
- * nothing. An empty nav is better than five dead links on a company's live site.
+ * The nav carries only destinations that resolve. Horoscope, Panchang and
+ * "Our Services" are absent because those routes do not exist — dead links on a
+ * company's live site are worse than a shorter menu.
  */
 
 export function SiteHeader() {
@@ -23,6 +25,7 @@ export function SiteHeader() {
             <i lang="en">Astrology</i>
           </span>
         </a>
+        <SiteNav />
       </div>
     </header>
   );

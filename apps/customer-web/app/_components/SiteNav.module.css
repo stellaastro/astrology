@@ -1,0 +1,102 @@
+/* Navigation — DESIGN.md §7.
+ *
+ * Must pass the trunk test: cover everything except the nav and a visitor can
+ * still identify the site, the current section, and the primary action.
+ *
+ * Every destination here resolves. Links to Horoscope or Panchang would be dead
+ * on a registered company's live site, so they are not here until they work.
+ */
+
+.desktop {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+
+.link:visited { color: var(--ink); }
+.link:hover { color: var(--cta); }
+
+/* Current section is marked with a rule as well as colour — colour alone is
+   not a signal for anyone who cannot distinguish it. */
+.link[aria-current='true'] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--cta);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 1.1rem;
+  border: 1px solid var(--cta);
+  border-radius: var(--radius);
+  background: var(--cta);
+  color: var(--surface);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+
+.cta:visited { color: var(--surface); }
+.cta:hover { background: var(--cta-hover); }
+
+/* Mobile bottom bar, hidden on desktop. */
+.bar { display: none; }
+
+@media (max-width: 860px) {
+  /* Hiding the desktop links and providing nothing else is the failure DESIGN.md
+     §7 records — on the viewport that carries most Indian traffic. */
+  .desktop { display: none; }
+
+  .bar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) 1.25fr;
+    gap: .35rem;
+    padding: .4rem .5rem calc(.4rem + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+  }
+
+  .barLink,
+  .barCta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--tap);
+    border-radius: var(--radius);
+    text-decoration: none;
+    font-size: .78rem;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .barLink { color: var(--ink); }
+  .barLink:visited { color: var(--ink); }
+  .barLink[aria-current='true'] {
+    color: var(--cta);
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .barCta {
+    background: var(--cta);
+    color: var(--surface);
+    padding-inline: .5rem;
+  }
+  .barCta:visited { color: var(--surface); }
+}
+
+/* The footer needs room to clear this bar — see globals.css, which owns
+   element selectors. A :global() rule here is invalid: CSS Modules requires
+   every selector to carry at least one local class. */
