@@ -6,10 +6,11 @@
  * only the page's own sections.
  *
  * Every statement here is true and checkable. Nothing is a placeholder dash,
- * a rating, a review count, a user total or a testimonial (§13). The three
- * astrologers are named because their names are confirmed; their experience,
- * specialisations and fees are NOT shown because those have not been supplied
- * and inventing them is precisely what §13 forbids.
+ * a rating, a review count, a user total or a testimonial (§13).
+ *
+ * The astrologers are READ FROM THE DATABASE (task 4.3). Their experience,
+ * specialisations and fees render only if those columns hold something — they
+ * are still owner action O3, and inventing them is precisely what §13 forbids.
  *
  * There is deliberately no email capture form: the leads endpoint does not
  * exist yet (Phase 2) and a form that silently discards submissions is worse
@@ -19,13 +20,52 @@
 import StellaHero from './_components/StellaHero';
 import WaitlistForm from './_components/WaitlistForm';
 
-const ASTROLOGERS = [
-  { hi: 'शिवपाल सिंह', en: 'Shivpal Singh', role: 'Executive Director' },
-  { hi: 'कृष्ण कुमार साहू', en: 'Krishn Kumar Sahu', role: 'Director' },
-  { hi: 'अशोक कुमार शर्मा', en: 'Ashok Kumar Sharma', role: 'Director' },
-] as const;
+interface PublicAstrologer {
+  slug: string;
+  nameHi: string;
+  nameEn: string;
+  headline: string | null;
+  experienceYears: number | null;
+  languages: string[];
+  specialisations: string[];
+  sessionRateDisplay: string | null;
+  sessionMinutes: number;
+  bookable: boolean;
+}
 
-export default function Home() {
+/**
+ * The founding astrologers, from the database (task 4.3, ADR-044).
+ *
+ * They were a hardcoded array until 2026-09-15. They are now rows, entered
+ * through the same admin screens any later astrologer will use — which is the
+ * point: the launch roster stops being a special case in code.
+ *
+ * CACHED for five minutes rather than fetched per request. The names are the
+ * one piece of substance on this page, and an API blip should not blank the
+ * section; a stale copy of three names that have not changed since incorporation
+ * is strictly better than an empty band.
+ *
+ * ON FAILURE IT RETURNS EMPTY, and the section says so honestly. It does NOT
+ * fall back to a hardcoded copy: two sources of truth for who works here is
+ * exactly the drift this task removed.
+ */
+async function getAstrologers(): Promise<PublicAstrologer[] | null> {
+  const base = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+  const prefix = process.env.API_GLOBAL_PREFIX ?? 'api/v1';
+  try {
+    const res = await fetch(`${base}/${prefix}/public/astrologers`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { astrologers?: PublicAstrologer[] };
+    return body.astrologers ?? [];
+  } catch {
+    return null;
+  }
+}
+
+export default async function Home() {
+  const astrologers = await getAstrologers();
   return (
     <>
       <StellaHero />
@@ -155,17 +195,35 @@ export default function Home() {
             </p>
           </div>
 
-          {ASTROLOGERS.map((a, i) => (
-            <article className="person" key={a.en}>
-              <span lang="en">{String(i + 1).padStart(2, '0')}</span>
-              <div>
-                <h3>{a.hi}</h3>
-                <p lang="en">
-                  {a.en} · {a.role}
-                </p>
-              </div>
-            </article>
-          ))}
+          {astrologers === null ? (
+            /* The API did not answer. Say that, rather than showing a
+               hardcoded copy — this page has one source of truth for who
+               works here, and a fallback would quietly become a second. */
+            <p lang="en" style={{ color: 'var(--dark-soft)' }}>
+              We could not load our astrologers just now. Please refresh in a
+              moment.
+            </p>
+          ) : (
+            astrologers.map((a, i) => (
+              <article className="person" key={a.slug}>
+                <span lang="en">{String(i + 1).padStart(2, '0')}</span>
+                <div>
+                  <h3>{a.nameHi}</h3>
+                  <p lang="en">
+                    {a.nameEn}
+                    {a.headline ? <> · {a.headline}</> : null}
+                    {/* Experience and price appear ONLY when they exist. No
+                        placeholder dash, no "20+ years", nothing invented —
+                        these are still owner action O3. */}
+                    {a.experienceYears !== null ? <> · {a.experienceYears} years</> : null}
+                    {a.sessionRateDisplay ? (
+                      <> · {a.sessionRateDisplay} / {a.sessionMinutes} min</>
+                    ) : null}
+                  </p>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
 

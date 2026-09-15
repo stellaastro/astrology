@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AstrologersService } from './astrologers.service';
-import { AdminAstrologersController, PublicAstrologersController } from './astrologers.controller';
+import {
+  AdminAstrologersController,
+  AstrologerSelfController,
+  PublicAstrologersController,
+} from './astrologers.controller';
 
 @Module({
-  controllers: [PublicAstrologersController, AdminAstrologersController],
+  controllers: [PublicAstrologersController, AdminAstrologersController, AstrologerSelfController],
   providers: [AstrologersService],
   exports: [AstrologersService],
 })

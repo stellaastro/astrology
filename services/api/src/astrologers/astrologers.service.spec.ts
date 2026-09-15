@@ -32,8 +32,13 @@ const ROW = {
   createdAt: new Date('2026-01-01T00:00:00Z'),
 };
 
-function harness(found: Record<string, unknown> | null = ROW) {
-  const tx = { astrologer: { create: vi.fn(async () => ROW), update: vi.fn(async () => ROW) } };
+const USER = { id: 'U1', email: 'a@example.invalid', roles: [] as string[] };
+
+function harness(found: Record<string, unknown> | null = ROW, user: typeof USER | null = USER) {
+  const tx = {
+    astrologer: { create: vi.fn(async () => ROW), update: vi.fn(async () => ROW) },
+    user: { update: vi.fn(async () => USER) },
+  };
   const prisma = {
     astrologer: {
       findMany: vi.fn(async () => [ROW]),
@@ -41,6 +46,7 @@ function harness(found: Record<string, unknown> | null = ROW) {
       create: vi.fn(async () => ROW),
       update: vi.fn(async () => ROW),
     },
+    user: { findUnique: vi.fn(async () => user) },
     $transaction: vi.fn(async (cb: never) => (cb as (t: unknown) => Promise<unknown>)(tx)),
   };
   const audit = { record: vi.fn(async () => 'AE1') };
@@ -157,5 +163,109 @@ describe('audit', () => {
     const h = harness(null);
     await expect(h.svc.update('nope', { nameEn: 'x' }, {})).rejects.toThrow(NotFoundException);
     await expect(h.svc.setPublished('nope', true, {})).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('named but not bookable', () => {
+  /*
+   * The state the three founding directors are actually in: real, named,
+   * already public — and with no price, because that is owner action O3 and it
+   * has not arrived. A model that required a rate meant the REAL people could
+   * not be entered while twenty invented ones could.
+   */
+  it('creates a profile with no rate and no experience', async () => {
+    const h = harness();
+    // The keys are ABSENT, not set to undefined: exactOptionalPropertyTypes
+    // treats those as different, and absent is what a real request sends.
+    const bare = dto();
+    delete (bare as Partial<CreateAstrologerDto>).sessionRate;
+    delete (bare as Partial<CreateAstrologerDto>).experienceYears;
+    await h.svc.create(bare, {});
+    const data = arg<{ data: Record<string, unknown> }>(h.tx.astrologer.create, 0, 0).data;
+    expect(data.sessionRatePaise).toBeNull();
+    expect(data.experienceYears).toBeNull();
+  });
+
+  it('reports such a profile as not bookable, with no invented price', async () => {
+    const h = harness();
+    h.prisma.astrologer.findMany = vi.fn(async () => [
+      { ...ROW, publishedAt: new Date(), sessionRatePaise: null, experienceYears: null },
+    ]) as never;
+    const [out] = await h.svc.listPublic();
+    expect(out?.bookable).toBe(false);
+    expect(out?.sessionRatePaise).toBeNull();
+    // Not "₹0.00", which would read as a free consultation nobody offered.
+    expect(out?.sessionRateDisplay).toBeNull();
+    expect(out?.experienceYears).toBeNull();
+  });
+
+  it('still refuses a rate of zero — absent and free are different', async () => {
+    const h = harness();
+    await expect(h.svc.create(dto({ sessionRate: '0' }), {})).rejects.toThrow(ConflictException);
+  });
+
+  it('marks a profile WITH a rate as bookable', async () => {
+    const h = harness();
+    h.prisma.astrologer.findMany = vi.fn(async () => [{ ...ROW, publishedAt: new Date() }]) as never;
+    const [out] = await h.svc.listPublic();
+    expect(out?.bookable).toBe(true);
+    expect(out?.sessionRateDisplay).toBe('₹1,250.50');
+  });
+});
+
+describe('linking a profile to an account (task 4.2)', () => {
+  it('sets the link and grants the astrologer role in ONE transaction', async () => {
+    const h = harness();
+    const out = await h.svc.linkAccount('A1', 'a@example.invalid', {});
+    expect(out.roles).toContain('astrologer');
+    expect(h.tx.astrologer.update).toHaveBeenCalledWith({ where: { id: 'A1' }, data: { userId: 'U1' } });
+    expect(h.tx.user.update).toHaveBeenCalled();
+    // One transaction: a link without a role is someone who cannot reach their
+    // own page, and a role without a link is a page that does not know them.
+    expect(h.prisma.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it('keeps roles additive rather than replacing them', async () => {
+    const h = harness(ROW, { ...USER, roles: ['admin:support'] });
+    const out = await h.svc.linkAccount('A1', 'a@example.invalid', {});
+    expect(out.roles).toEqual(['admin:support', 'astrologer']);
+  });
+
+  it('refuses when the account does not exist yet', async () => {
+    const h = harness(ROW, null);
+    // Creating one here would mean inventing a password nobody chose or a
+    // Google identity that cannot be verified.
+    await expect(h.svc.linkAccount('A1', 'nobody@example.invalid', {})).rejects.toThrow(ConflictException);
+    expect(h.tx.astrologer.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to link one account to a second profile', async () => {
+    const h = harness();
+    h.prisma.astrologer.findUnique = vi.fn(async (q: { where: Record<string, unknown> }) =>
+      q.where.userId ? { ...ROW, id: 'OTHER', nameEn: 'Someone Else' } : ROW) as never;
+    await expect(h.svc.linkAccount('A1', 'a@example.invalid', {})).rejects.toThrow(/already linked/);
+  });
+
+  it('never writes the address into the audit event', async () => {
+    const h = harness();
+    await h.svc.linkAccount('A1', 'a@example.invalid', {});
+    // The audit log holds no personal data (ADR-040); the ULID is what makes
+    // the link traceable.
+    expect(JSON.stringify(h.audit.record.mock.calls)).not.toContain('@');
+  });
+});
+
+describe('the astrologer own-profile lookup', () => {
+  it('looks up by userId, never by a supplied id', async () => {
+    const h = harness();
+    h.prisma.astrologer.findUnique = vi.fn(async () => ROW) as never;
+    await h.svc.findForUser('U1');
+    expect(h.prisma.astrologer.findUnique).toHaveBeenCalledWith({ where: { userId: 'U1' } });
+  });
+
+  it('explains what to do when the account is not linked', async () => {
+    const h = harness();
+    h.prisma.astrologer.findUnique = vi.fn(async () => null) as never;
+    await expect(h.svc.findForUser('U9')).rejects.toThrow(/not linked/);
   });
 });

@@ -323,12 +323,21 @@ model Astrologer {
   nameHi String @map("name_hi") @db.VarChar(120)
   nameEn String @map("name_en") @db.VarChar(120)
 
+  /// Also carries the company office for the founding directors — "Executive
+  /// Director", "Director". A separate column for one label at a roster of
+  /// three would be over-modelling; revisit if it ever needs to be filtered on.
   headline String? @db.VarChar(160)
   bio      String? @db.Text
 
   /// An integer, not a string. "20+ years" is a rendering decision, not data,
   /// and a string here cannot be sorted or validated.
-  experienceYears Int @map("experience_years")
+  ///
+  /// NULLABLE, and that is the point (ADR-044). The three founding directors
+  /// are real, named and already public, but their years of practice have not
+  /// been supplied (owner action O3). A required column here meant the real
+  /// people could not be entered at all while twenty invented ones could —
+  /// the model demanding data nobody has is the model being wrong.
+  experienceYears Int? @map("experience_years")
 
   /// JSON arrays. MySQL has no array type, and join tables for languages and
   /// specialisations at a roster of twelve would cost more than they explain.
@@ -343,8 +352,12 @@ model Astrologer {
   /// snapshot at creation and must never read back through this column — a rate
   /// change would otherwise silently rewrite the price of every past booking
   /// (§79, Phase 6).
-  sessionRatePaise Int @map("session_rate_paise")
-  sessionMinutes   Int @default(30) @map("session_minutes")
+  /// NULLABLE for the same reason as experienceYears. A profile with no rate is
+  /// PUBLISHABLE but not BOOKABLE — it can be named on the site as a founding
+  /// astrologer while the price is still an owner decision. Phase 6 enforces
+  /// the second half: no rate, no booking.
+  sessionRatePaise Int? @map("session_rate_paise")
+  sessionMinutes   Int  @default(30) @map("session_minutes")
 
   /// An R2 object key, never a URL. The KYC and media buckets are private and
   /// links are signed at read time with a short TTL (ADR-042), so storing a URL

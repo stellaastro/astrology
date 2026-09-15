@@ -56,7 +56,13 @@ export default function SiteNav() {
      How it works and Join the waitlist are noise there — and a "Join the
      waitlist" button on a sign-in page invites a misclick. The brand link in
      the header still gets you home. */
-  if (pathname?.startsWith('/admin')) return null;
+  /*
+   * Signed-in surfaces get no public nav. "Join the waitlist" and "How it
+   * works" are for a visitor deciding whether to sign up; an astrologer
+   * looking at their own profile has already decided, and the links are noise
+   * at best and confusing at worst.
+   */
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/astrologer')) return null;
 
   const isCurrent = (href: string) => href.endsWith(active) && active !== '';
 

@@ -38,6 +38,8 @@ export interface AdminAstrologer {
   published: boolean;
   retired: boolean;
   isDevFixture: boolean;
+  /** Whether a sign-in account is attached, so the row can say 'Relink'. */
+  linked: boolean;
   createdAt: string;
 }
 

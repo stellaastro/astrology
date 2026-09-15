@@ -97,7 +97,7 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 4 — astrologer profiles. Task 4.1 done; 4.2 and 4.3 remain.**
+**Phase 4 — astrologer profiles. 4.1, 4.2 and 4.3 done. Phase 5 is next.**
 Build order:
 
 ```
@@ -122,15 +122,24 @@ publish endpoints, a public roster that is real-or-empty, and the 20-strong
 synthetic roster (task 1.9 as widened). Profiles are **admin-created and draft
 by default** — publishing is a separate, audited decision.
 
+**4.2 and 4.3 done (ADR-044).** The three directors are real rows and the
+landing page reads them from the database. `/astrologer` is the practitioner's
+own surface; an admin links a profile to a signed-in account, which grants the
+`astrologer` role.
+
+**4.2's three named deliverables are NOT built and that is deliberate** — the
+availability editor is Phase 5, upcoming bookings Phase 6, the join link Phase
+8. None of those models exists yet, and the page says so rather than showing
+controls that do nothing.
+
 **Still open in Phase 4:**
 
-- **4.2** astrologer surfaces as role-guarded routes in admin-web — availability
-  editor, upcoming bookings, join link. Dropping Flutter removed the astrologer
-  app and nothing replaced it.
-- **4.3** migrate the Phase 2 static astrologer content to real rows. The three
-  directors go in through the same admin screens, **as data, never as code** —
-  and they still need O3 (photographs, credentials, per-session price).
 - **4.4** recruiting. Not engineering; owner action per O5.
+- **O3 still blocks the detail.** The directors are named and published, but
+  their experience, credentials, specialisations, photographs and per-session
+  price are absent — deliberately null, not zero. Until the price exists they
+  are **publishable but not bookable**, which is a real state the model now
+  carries. Add them through `/admin/astrologers`.
 
 **The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
 price snapshot; never read a past booking's price back through

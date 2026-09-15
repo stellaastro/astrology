@@ -18,7 +18,7 @@ export interface PublicAstrologer {
   nameEn: string;
   headline: string | null;
   bio: string | null;
-  experienceYears: number;
+  experienceYears: number | null;
   languages: string[];
   specialisations: string[];
   /*
@@ -33,9 +33,11 @@ export interface PublicAstrologer {
    * back into a number, and parsing a formatted currency string is exactly the
    * step where a float creeps back in.
    */
-  sessionRatePaise: number;
-  sessionRateDisplay: string;
+  sessionRatePaise: number | null;
+  sessionRateDisplay: string | null;
   sessionMinutes: number;
+  /** False when no rate is set: named on the site, but not yet bookable. */
+  bookable: boolean;
 }
 
 const asStringArray = (v: Prisma.JsonValue | null): string[] =>
@@ -86,7 +88,20 @@ export class AstrologersService {
         retiredAt: null,
         isDevFixture: false,
       },
-      orderBy: [{ experienceYears: 'desc' }, { nameEn: 'asc' }],
+      /*
+       * INSERTION ORDER, not experience.
+       *
+       * Sorting by experienceYears desc reads well until every value is null —
+       * which is the state the three founding directors are actually in — and
+       * then it collapses to alphabetical and silently reorders real people on
+       * a live page. It put the Executive Director third.
+       *
+       * createdAt is stable (an edit does not change it) and preserves the
+       * order they were entered in, which is the order the site has always
+       * shown. If the owner ever wants to reorder them deliberately, that is a
+       * displayOrder column, not a sort key that happens to work.
+       */
+      orderBy: { createdAt: 'asc' },
       take: MAX_PAGE,
     });
 
@@ -100,8 +115,11 @@ export class AstrologersService {
       languages: asStringArray(a.languages),
       specialisations: asStringArray(a.specialisations),
       sessionRatePaise: a.sessionRatePaise,
-      sessionRateDisplay: Money.fromPaise(a.sessionRatePaise).format(),
+      sessionRateDisplay:
+        a.sessionRatePaise === null ? null : Money.fromPaise(a.sessionRatePaise).format(),
       sessionMinutes: a.sessionMinutes,
+      // Named on the site without a price is a real state, not a broken one.
+      bookable: a.sessionRatePaise !== null,
     }));
   }
 
@@ -128,8 +146,13 @@ export class AstrologersService {
       languages: asStringArray(a.languages),
       specialisations: asStringArray(a.specialisations),
       sessionRatePaise: a.sessionRatePaise,
-      sessionRateDisplay: Money.fromPaise(a.sessionRatePaise).format(),
+      sessionRateDisplay:
+        a.sessionRatePaise === null ? null : Money.fromPaise(a.sessionRatePaise).format(),
       sessionMinutes: a.sessionMinutes,
+      bookable: a.sessionRatePaise !== null,
+      // So the admin row can say "Relink" rather than offering to link an
+      // account that is already attached.
+      linked: a.userId !== null,
       published: a.publishedAt !== null,
       retired: a.retiredAt !== null,
       isDevFixture: a.isDevFixture,
@@ -138,11 +161,20 @@ export class AstrologersService {
   }
 
   async create(dto: CreateAstrologerDto, actor: AuditActor) {
-    // Parsed BEFORE the write, so a malformed rate fails as a 400 rather than
-    // landing as a rounded number nobody asked for.
-    const rate = Money.fromString(dto.sessionRate);
-    if (rate.paise <= 0) {
-      throw new ConflictException('A session rate must be greater than zero.');
+    /*
+     * Parsed BEFORE the write, so a malformed rate fails as a 400 rather than
+     * landing as a rounded number nobody asked for.
+     *
+     * Absent is allowed and means "not bookable yet". Zero is not: a rate of
+     * zero would read as a free consultation, which is a decision nobody made.
+     */
+    let ratePaise: number | null = null;
+    if (dto.sessionRate !== undefined) {
+      const rate = Money.fromString(dto.sessionRate);
+      if (rate.paise <= 0) {
+        throw new ConflictException('A session rate must be greater than zero.');
+      }
+      ratePaise = rate.paise;
     }
 
     const id = ulid();
@@ -156,10 +188,10 @@ export class AstrologersService {
             nameEn: dto.nameEn,
             headline: dto.headline ?? null,
             bio: dto.bio ?? null,
-            experienceYears: dto.experienceYears,
+            experienceYears: dto.experienceYears ?? null,
             languages: dto.languages,
             specialisations: dto.specialisations,
-            sessionRatePaise: rate.paise,
+            sessionRatePaise: ratePaise,
             sessionMinutes: dto.sessionMinutes,
             // Created as a DRAFT, always. Publishing is a separate, audited
             // decision — nothing reaches the public site as a side effect of
@@ -236,6 +268,103 @@ export class AstrologersService {
     });
 
     return { id, updated: true };
+  }
+
+  /**
+   * Links an astrologer profile to a sign-in account, and grants the role.
+   *
+   * THIS IS THE MISSING HALF OF 4.2. Profiles are admin-created, so `userId` is
+   * null until someone does this — and until it is set, an astrologer who signs
+   * in reaches nothing, because there is no way to tell which profile is theirs.
+   *
+   * The account must ALREADY EXIST, which means they have signed in once with
+   * Google. Creating an account here would mean inventing a password nobody
+   * chose, or a Google identity that cannot be verified. Same reasoning as
+   * grant-role: sign in first, then be granted.
+   *
+   * The role and the link are set in ONE transaction. A profile linked to an
+   * account with no role is a person who cannot reach their own page; a role
+   * with no link is a person whose page does not know who they are. Both
+   * half-states are confusing in exactly the way that wastes an afternoon.
+   */
+  async linkAccount(id: string, email: string, actor: AuditActor) {
+    const normalised = email.trim().toLowerCase();
+
+    const astrologer = await this.prisma.astrologer.findUnique({ where: { id } });
+    if (!astrologer) throw new NotFoundException('No such astrologer.');
+
+    const user = await this.prisma.user.findUnique({ where: { email: normalised } });
+    if (!user) {
+      throw new ConflictException(
+        `No account for ${normalised}. They must sign in once with Google first, ` +
+          `then this can be linked.`,
+      );
+    }
+
+    // userId is @unique: one account, one profile. A clearer message than the
+    // raw P2002 that would otherwise surface.
+    const taken = await this.prisma.astrologer.findUnique({ where: { userId: user.id } });
+    if (taken && taken.id !== id) {
+      throw new ConflictException(
+        `That account is already linked to ${taken.nameEn}. One account, one profile.`,
+      );
+    }
+
+    const before = Array.isArray(user.roles) ? (user.roles as string[]) : [];
+    const after = [...new Set([...before, 'astrologer'])].sort();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.astrologer.update({ where: { id }, data: { userId: user.id } });
+      await tx.user.update({ where: { id: user.id }, data: { roles: after } });
+
+      await this.audit.record(tx, {
+        action: 'astrologer.account.linked',
+        targetType: 'Astrologer',
+        targetId: id,
+        // The user's ULID, not their address: the audit log holds no personal
+        // data (ADR-040), and the id is what makes the link traceable anyway.
+        before: { userId: astrologer.userId, roles: before },
+        after: { userId: user.id, roles: after },
+        actor,
+      });
+    });
+
+    this.log.log(`Linked astrologer ${astrologer.slug} to user ${user.id}`);
+    return { id, userId: user.id, roles: after };
+  }
+
+  /**
+   * The profile belonging to the signed-in astrologer.
+   *
+   * Looked up BY userId, never by a parameter. An endpoint that took an id and
+   * checked it afterwards is one refactor away from not checking.
+   */
+  async findForUser(userId: string) {
+    const a = await this.prisma.astrologer.findUnique({ where: { userId } });
+    if (!a) {
+      throw new NotFoundException(
+        'Your account is not linked to an astrologer profile yet. An ' +
+          'administrator needs to link it.',
+      );
+    }
+    return {
+      id: a.id,
+      slug: a.slug,
+      nameHi: a.nameHi,
+      nameEn: a.nameEn,
+      headline: a.headline,
+      bio: a.bio,
+      experienceYears: a.experienceYears,
+      languages: asStringArray(a.languages),
+      specialisations: asStringArray(a.specialisations),
+      sessionRatePaise: a.sessionRatePaise,
+      sessionRateDisplay:
+        a.sessionRatePaise === null ? null : Money.fromPaise(a.sessionRatePaise).format(),
+      sessionMinutes: a.sessionMinutes,
+      bookable: a.sessionRatePaise !== null,
+      published: a.publishedAt !== null,
+      retired: a.retiredAt !== null,
+    };
   }
 
   /**

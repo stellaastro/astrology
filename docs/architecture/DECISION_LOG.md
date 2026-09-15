@@ -1543,3 +1543,70 @@ unpublished, one retired — because seeding only the happy path is how the empt
 and error states ship having never been looked at. Every row carries
 `isDevFixture` and a `fixtureDataset`, so cleanup deletes only what that run
 created; "delete where is_dev_fixture" would take another dataset's rows too.
+
+---
+
+## ADR-044 — Experience and rate are nullable; the founders are rows
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Tasks:** 4.2, 4.3
+
+**Decision.** `Astrologer.experienceYears` and `Astrologer.sessionRatePaise`
+are nullable. The three founding directors are real rows, entered through a
+one-off CLI, published, and read by the landing page.
+
+**Why nullable.** The three directors are real, named, and have been on the
+public site since Phase 2 — but their years of practice and per-session price
+are owner action O3 and have not arrived. Required columns meant **the real
+people could not be entered while twenty invented ones could.** A model that
+demands data nobody has is the model being wrong, not the data.
+
+This creates a state worth naming: **publishable but not bookable.** A profile
+can be named on the site as a founding astrologer while the price remains an
+owner decision. `bookable` is derived from the rate being present, and Phase 6
+enforces the second half — no rate, no booking. A rate of **zero is still
+refused**: absent and free are different claims, and nobody decided to give
+consultations away.
+
+**The landing page reads from the database** and no longer carries a hardcoded
+array. On a failed fetch it says so rather than falling back to a copy of the
+names: two sources of truth for who works here is exactly the drift this
+removed. Cached with a five-minute revalidate, so an API blip cannot blank the
+founders band.
+
+**An ordering bug this exposed.** `listPublic` sorted by `experienceYears desc,
+nameEn asc`, which reads well until every value is null — then it collapses to
+alphabetical and silently reordered three real people on a live page, putting
+the Executive Director third. It now sorts by `createdAt asc`, which is stable
+and preserves the order the site has always shown. A deliberate reorder would
+be a `displayOrder` column, not a sort key that happens to work.
+
+**Founders were imported by CLI, not through the admin screen.** The screen is
+the right tool for every astrologer after these three; this was a one-off
+migration of content that was hardcoded in `app/page.tsx`, and the audit trail
+should say a CLI run on the host did it rather than record the owner's account
+as having typed it in. The import enters names and company office and
+**nothing else** — it is idempotent and never overwrites, so a re-run cannot
+wipe credentials added later through the screen.
+
+### Task 4.2 — the astrologer's own surface
+
+`Astrologer.userId` existed from ADR-043 and nothing ever set it, so an
+astrologer who signed in reached nothing. `POST /admin/astrologers/:id/link`
+attaches an account and grants the `astrologer` role **in one transaction**: a
+link without a role is someone who cannot reach their own page, and a role
+without a link is a page that does not know who they are. Both half-states
+waste an afternoon.
+
+The account must already exist — sign in with Google once, then be linked.
+Creating one here would mean inventing a password nobody chose or a Google
+identity that cannot be verified, the same reasoning as `grant-role`.
+
+`GET /astrologer/me` resolves the profile **from the session**, never from a
+parameter: an endpoint that takes an id and checks it afterwards is one
+refactor away from not checking.
+
+**What 4.2 deliberately does not ship.** Its three named deliverables — the
+availability editor, upcoming bookings and the join link — belong to Phases 5,
+6 and 8, and none of those models exists. Screens built against models that do
+not exist are how a demo gets mistaken for a working feature (§71). The page
+says what is coming and shows no controls that do nothing.

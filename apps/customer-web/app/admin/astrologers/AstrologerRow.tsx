@@ -16,6 +16,8 @@ export default function AstrologerRow({ astrologer: a }: { astrologer: AdminAstr
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [notice, setNotice] = useState('');
 
   async function toggle() {
     if (busy) return;
@@ -53,6 +55,50 @@ export default function AstrologerRow({ astrologer: a }: { astrologer: AdminAstr
     }
   }
 
+  /**
+   * Link this profile to a sign-in account.
+   *
+   * The account must already exist — the person signs in with Google once,
+   * then an administrator links them. Creating an account here would mean
+   * inventing a Google identity that cannot be verified.
+   */
+  async function link(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    const email = String(new FormData(e.currentTarget).get('email') ?? '').trim();
+    if (!email) return;
+
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await fetch(`/api/v1/admin/astrologers/${a.id}/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setLinking(false);
+        setNotice('Linked. They can now sign in and see their profile.');
+        router.refresh();
+        return;
+      }
+      const body: unknown = await res.json().catch(() => null);
+      const msg =
+        body && typeof body === 'object' && typeof (body as { message?: unknown }).message === 'string'
+          ? (body as { message: string }).message
+          : '';
+      // A 409 here is usually "they have not signed in yet", which is the
+      // useful thing to say — not "conflict".
+      setError(msg || `Could not link (${res.status}). Nothing was changed.`);
+    } catch {
+      setError('Could not reach the server. Nothing was changed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const status = a.retired ? 'retired' : a.published ? 'live' : 'draft';
   const badgeClass =
     status === 'live' ? s.badgeLive : status === 'retired' ? s.badgeRetired : s.badgeDraft;
@@ -81,6 +127,14 @@ export default function AstrologerRow({ astrologer: a }: { astrologer: AdminAstr
           <button
             className={s.action}
             type="button"
+            onClick={() => { setLinking((v) => !v); setError(''); setNotice(''); }}
+            disabled={busy}
+          >
+            {a.linked ? 'Relink account' : 'Link account'}
+          </button>
+          <button
+            className={s.action}
+            type="button"
             onClick={toggle}
             disabled={busy || a.retired || (a.isDevFixture && !a.published)}
             title={
@@ -94,6 +148,34 @@ export default function AstrologerRow({ astrologer: a }: { astrologer: AdminAstr
             {busy ? '…' : a.published ? 'Unpublish' : 'Publish'}
           </button>
         </div>
+        {linking ? (
+          <form onSubmit={link} style={{ marginTop: '.5rem', display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+            <label className="visually-hidden" htmlFor={`link-${a.id}`}>
+              Account email for {a.nameEn}
+            </label>
+            <input
+              id={`link-${a.id}`}
+              name="email"
+              type="email"
+              required
+              placeholder="their Google address"
+              style={{
+                minHeight: 'var(--tap)', padding: '0 .6rem', fontSize: 'var(--step--1)',
+                border: '1px solid var(--ink-soft)', borderRadius: 'var(--radius)',
+                background: 'var(--surface)', color: 'var(--ink)', fontFamily: 'var(--font-body)',
+              }}
+            />
+            <button className={s.action} type="submit" disabled={busy}>
+              {busy ? '…' : 'Link'}
+            </button>
+          </form>
+        ) : null}
+
+        {notice ? (
+          <p role="status" style={{ margin: '.4rem 0 0', fontSize: '.85em', color: 'var(--leaf)' }}>
+            {notice}
+          </p>
+        ) : null}
         {error ? (
           <p role="alert" style={{ margin: '.4rem 0 0', fontSize: '.85em', color: 'var(--cta)' }}>
             {error}

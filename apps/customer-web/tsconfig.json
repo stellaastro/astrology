@@ -21,8 +21,10 @@
     ".next-dev/types/**/*.ts",
     ".next-prod/types/**/*.ts",
     ".next-release-admin/types/**/*.ts",
+    ".next-release-astrologers/types/**/*.ts",
     ".next-release-confirm/types/**/*.ts",
     ".next-release-design/types/**/*.ts",
+    ".next-release-founders/types/**/*.ts",
     ".next-release-hero-objects-larger/types/**/*.ts",
     ".next-release-hero-objects/types/**/*.ts",
     ".next-release-hero-small/types/**/*.ts",
@@ -34,7 +36,7 @@
     ".next-release-signin/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-release-astrologers/types/**/*.ts"
+    ".next-release-42/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
