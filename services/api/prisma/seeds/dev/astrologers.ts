@@ -63,6 +63,30 @@ const SPECIALISATIONS = [
  */
 const RATES_PAISE = [49900, 78900, 99900, 125050, 150000, 249975] as const;
 
+/**
+ * Weekly windows, varied on purpose (task 5.1).
+ *
+ * A roster where everyone works identical hours never produces two
+ * practitioners free at the same minute, never produces a day with nobody
+ * available, and never produces a window too short for the session length —
+ * which are exactly the states booking has to handle.
+ */
+const SHAPES: readonly (readonly { weekday: number; startMinute: number; endMinute: number }[])[] = [
+  // Weekday mornings.
+  [1, 2, 3, 4, 5].map((weekday) => ({ weekday, startMinute: 9 * 60, endMinute: 13 * 60 })),
+  // Evenings, including the weekend.
+  [0, 2, 4, 6].map((weekday) => ({ weekday, startMinute: 18 * 60, endMinute: 21 * 60 })),
+  // Split day, two windows — the case a naive editor collapses into one.
+  [1, 3, 5].flatMap((weekday) => [
+    { weekday, startMinute: 10 * 60, endMinute: 12 * 60 },
+    { weekday, startMinute: 16 * 60, endMinute: 19 * 60 },
+  ]),
+  // Weekend only.
+  [0, 6].map((weekday) => ({ weekday, startMinute: 11 * 60, endMinute: 17 * 60 })),
+  // A single short window: with a 60-minute session this yields exactly one slot.
+  [3].map((weekday) => ({ weekday, startMinute: 20 * 60, endMinute: 21 * 60 })),
+] as const;
+
 export async function seedAstrologers(prisma: PrismaClient): Promise<number> {
   // Guards itself rather than trusting index.ts to have done it. This function
   // is exported, so "the caller checked" is true only until someone imports it
@@ -114,6 +138,58 @@ export async function seedAstrologers(prisma: PrismaClient): Promise<number> {
         fixtureDataset: DATASET,
       },
     });
+
+    // Availability, so the schedule screens have something to render. Skipped
+    // for two of them: "this astrologer has set no hours" is a state the UI has
+    // to handle and it will not appear if every fixture has a full week.
+    const row = await prisma.astrologer.findUnique({ where: { slug }, select: { id: true } });
+    if (row && i % 9 !== 0) {
+      await prisma.availabilityRule.deleteMany({ where: { astrologerId: row.id } });
+      for (const w of SHAPES[i % SHAPES.length]!) {
+        await prisma.availabilityRule.create({
+          data: { id: nextId(), astrologerId: row.id, ...w },
+        });
+      }
+
+      /*
+       * A block on a day this astrologer ACTUALLY WORKS.
+       *
+       * The first version put every block a fixed week out, which landed on
+       * weekdays for someone who only works weekends — so the block hid
+       * nothing and the "away" state never appeared anywhere. A fixture that
+       * cannot change the answer is not testing anything.
+       */
+      if (i % 4 === 0) {
+        const shape = SHAPES[i % SHAPES.length]!;
+        const worksOn = new Set(shape.map((w) => w.weekday));
+        const IST_MS = 330 * 60_000;
+
+        // Walk forward to the next date whose IST weekday is one they work.
+        let day = new Date(now + 86_400_000);
+        for (let guard = 0; guard < 14; guard++) {
+          if (worksOn.has(new Date(day.getTime() + IST_MS).getUTCDay())) break;
+          day = new Date(day.getTime() + 86_400_000);
+        }
+
+        const ist = new Date(day.getTime() + IST_MS);
+        // Midnight IST on that date, expressed as the UTC instant it names.
+        const from = new Date(
+          Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 0, -330),
+        );
+
+        await prisma.availabilityBlock.deleteMany({ where: { astrologerId: row.id } });
+        await prisma.availabilityBlock.create({
+          data: {
+            id: nextId(),
+            astrologerId: row.id,
+            startsAt: from,
+            endsAt: new Date(from.getTime() + 86_400_000),
+            reason: 'Sample block — away for the day',
+          },
+        });
+      }
+    }
+
     created++;
   }
 

@@ -1610,3 +1610,60 @@ availability editor, upcoming bookings and the join link — belong to Phases 5,
 6 and 8, and none of those models exists. Screens built against models that do
 not exist are how a demo gets mistaken for a working feature (§71). The page
 says what is coming and shows no controls that do nothing.
+
+---
+
+## ADR-045 — Availability: weekly rules in IST wall-clock, blocks in UTC
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Tasks:** 5.1, 5.2
+
+**Decision.** Two models, stored differently on purpose.
+
+- **`AvailabilityRule`** — a recurring weekly window, stored as an **IST
+  wall-clock** weekday plus minutes-from-midnight. "I work Tuesdays 09:00 to
+  13:00" is a statement about local clock time that stays true whatever happens
+  elsewhere. Stored as a UTC instant it would mean something different every
+  time another country changed its clocks (task 6.5).
+- **`AvailabilityBlock`** — a one-off absence, stored as **UTC instants**. "I am
+  at a wedding from Friday evening to Sunday night" is a real interval in the
+  world, not a claim about clock readings.
+
+Conflating the two is what makes a schedule drift.
+
+**IST is a fixed +05:30 and the arithmetic is exact**, so no date library is
+used. India has observed no daylight saving since 1945. **That is an assumption
+about India, not about time** — an astrologer in a DST-observing country would
+need a real timezone library and a zone id per rule, and `slots.ts` would then
+be wrong rather than merely incomplete. The assumption is stated at the top of
+that file so the next person meets it before the code.
+
+**The buffer widens the STRIDE, never the session (5.2).** A 30-minute session
+with a 10-minute buffer occupies 40 minutes of the day and bills for 30 —
+billing is per slot (ADR-024), so a buffer that lengthened the session would
+quietly overcharge. The fit test is against the session alone, so a window
+ending at 13:00 still yields a 12:30 slot: the buffer protects the *next*
+session and there is no next session. Requiring room for a trailing buffer
+would silently lose the last slot of every working day.
+
+**Overlapping windows are refused in the service, because MySQL cannot refuse
+them.** There are no exclusion constraints, so two windows covering the same
+minute would generate the same slot twice — and a duplicated slot is a double
+booking waiting for two customers to find it. Same class of gap as ADR-029's
+partial-index problem: the database will store what the domain forbids, so the
+check lives in code and is tested.
+
+**The weekly grid is replaced, not merged.** An editor shows the week as a
+whole and "these are my hours" is one statement; applying it as a series of
+adds and removes leaves a window where the grid is half old and half new, and a
+booking taken then is taken against hours nobody set. Validation runs before
+the delete, so a bad payload cannot clear the existing grid on its way to
+failing.
+
+**An unpublished, retired or fixture profile is NOT FOUND to the public**, not
+"no slots" — the same answer an unknown slug gets, so the endpoint cannot be
+used to discover which profiles exist but are unpublished.
+
+**Still open: 5.3.** Shrinking availability must not orphan an already-paid
+booking. There are no bookings yet, so there is nothing to orphan — this lands
+with Phase 6, and the rule belongs next to the booking model rather than
+guessed at now.

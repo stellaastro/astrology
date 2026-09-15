@@ -97,7 +97,7 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 4 — astrologer profiles. 4.1, 4.2 and 4.3 done. Phase 5 is next.**
+**Phase 5 — availability. 5.1 and 5.2 done; 5.3 waits for Phase 6.**
 Build order:
 
 ```
@@ -140,6 +140,12 @@ controls that do nothing.
   price are absent — deliberately null, not zero. Until the price exists they
   are **publishable but not bookable**, which is a real state the model now
   carries. Add them through `/admin/astrologers`.
+
+**Availability (ADR-045):** weekly rules are **IST wall-clock**, blocks are
+**UTC instants**, and the difference is load-bearing. The inter-slot buffer
+widens the stride, never the session — billing is per slot, so a buffer that
+lengthened the session would overcharge. Overlapping windows are refused in the
+service because MySQL has no exclusion constraints.
 
 **The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
 price snapshot; never read a past booking's price back through

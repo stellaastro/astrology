@@ -371,6 +371,14 @@ model Astrologer {
   sessionRatePaise Int? @map("session_rate_paise")
   sessionMinutes   Int  @default(30) @map("session_minutes")
 
+  /// Minutes left free AFTER each session (task 5.2).
+  ///
+  /// Not cosmetic: Phase 6's overrun policy needs somewhere for a consultation
+  /// that runs long to go. Without a buffer the only options are cutting
+  /// someone off mid-sentence or silently eating into the next booking, and
+  /// the second is how a scheduled-appointment product turns into a queue.
+  bufferMinutes Int @default(0) @map("buffer_minutes")
+
   /// An R2 object key, never a URL. The KYC and media buckets are private and
   /// links are signed at read time with a short TTL (ADR-042), so storing a URL
   /// would store something that stops working.
@@ -390,6 +398,9 @@ model Astrologer {
   isDevFixture   Boolean @default(false) @map("is_dev_fixture")
   fixtureDataset String? @map("fixture_dataset") @db.VarChar(64)
 
+  availabilityRules  AvailabilityRule[]
+  availabilityBlocks AvailabilityBlock[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -398,4 +409,68 @@ model Astrologer {
   @@index([isDevFixture])
   @@index([fixtureDataset])
   @@map("astrologers")
+}
+
+/// A recurring weekly window an astrologer works (task 5.1).
+///
+/// STORED IN Asia/Kolkata WALL-CLOCK, deliberately, per task 6.5. "I work
+/// Tuesdays 09:00–13:00" is a statement about local time that stays true
+/// whatever happens elsewhere; storing it as a UTC instant would make it a
+/// different claim every time some other country changed its clocks.
+///
+/// India has no DST and has not since 1945, so IST is a fixed +05:30 and the
+/// conversion to UTC is exact arithmetic rather than a lookup. THAT IS AN
+/// ASSUMPTION ABOUT INDIA, not about time: an astrologer in a DST-observing
+/// country would need a real timezone library and a zone id on this row.
+model AvailabilityRule {
+  id String @id @db.Char(26) // ULID
+
+  astrologerId String     @map("astrologer_id") @db.Char(26)
+  astrologer   Astrologer @relation(fields: [astrologerId], references: [id], onDelete: Cascade)
+
+  /// 0 = Sunday … 6 = Saturday, matching JavaScript's getDay().
+  weekday Int @db.TinyInt
+
+  /// Minutes from midnight IST. 540 = 09:00, 780 = 13:00.
+  ///
+  /// Integers rather than a TIME column: they compare and sort without any
+  /// question of what zone the value is in, and a TIME column next to a
+  /// DATETIME invites reading one as if it carried the other's zone.
+  startMinute Int @map("start_minute")
+  endMinute   Int @map("end_minute")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// MySQL HAS NO EXCLUSION CONSTRAINTS, so overlapping windows cannot be
+  /// forbidden by the schema — the service checks. Same class of gap as the
+  /// partial-unique-index problem in ADR-029: the database will happily store
+  /// something the domain forbids, so the check has to live somewhere and be
+  /// tested.
+  @@index([astrologerId, weekday])
+  @@map("availability_rules")
+}
+
+/// A one-off period an astrologer is NOT available (task 5.1).
+///
+/// UTC INSTANTS, unlike the weekly rule above, and the difference matters: a
+/// block is a real interval in the world ("I am at a wedding from Friday
+/// evening to Sunday night"), not a statement about local clock time.
+model AvailabilityBlock {
+  id String @id @db.Char(26) // ULID
+
+  astrologerId String     @map("astrologer_id") @db.Char(26)
+  astrologer   Astrologer @relation(fields: [astrologerId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime @map("starts_at")
+  endsAt   DateTime @map("ends_at")
+
+  /// Shown to nobody but the astrologer and an admin. A customer sees a slot
+  /// that is not offered, never the reason.
+  reason String? @db.VarChar(160)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([astrologerId, startsAt])
+  @@map("availability_blocks")
 }
