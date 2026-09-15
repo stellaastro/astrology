@@ -58,6 +58,8 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 | CTA | Terracotta `#A94424` on ivory `#FFF8E8` (5.61:1). On lotus cream it is **4.61:1** — AA by 0.11, and the lint guards that pair |
 | Type | **Serif display, sans body** (ADR-035): Cormorant Garamond (Latin headings) · Tiro Devanagari Hindi (Devanagari headings) · **Mukta** (all body and UI, covers both scripts). Inter still rejected — no Devanagari coverage |
 | Dev data | **Fully synthetic roster** in dev and staging — astrologers, customers, bookings, KYC (ADR-036). Production public pages are **real or empty**, never invented practitioners |
+| Auth | **Google sign-in for customers** (ADR-037) — phone OTP dropped, Firebase dropped with it. **Admin is one account, `admin@stellaastro.com`, password only** (ADR-038) — owner decision, supersedes ADR-018's MFA requirement; revisit before Phase 7 |
+| Sessions | **Server-side rows**, not signed tokens (ADR-039). Revocation must be a lookup the server can change. The guard denies by default — a route is public only if it says `@Public()` |
 | Backend | NestJS + TypeScript. Not FastAPI, not Pydantic |
 | Web | Next.js (customer + admin). Admin is a role-guarded route group, not a separate app |
 | Mobile | **Web-only for V1.** Flutter is deferred, not cancelled (ADR-022 supersedes ADR-007) |
