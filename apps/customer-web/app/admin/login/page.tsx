@@ -17,11 +17,20 @@ export const metadata: Metadata = {
 
 export default function AdminLoginPage() {
   return (
-    <div className="page" lang="en">
-      <div className="wrap">
-        <p className="eyebrow">Stella</p>
-        <h1 className="pageTitle">Sign in</h1>
-        <LoginForm />
+    <div className="signin" lang="en">
+      <div className="signinInner">
+        <div className="signinHead">
+          {/* Decorative: the page already says "Stella Astrology" in text
+              directly below, so alt text here would only repeat it. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/wheel.webp" alt="" width={74} height={74} />
+          <p className="eyebrow">Stella Astrology</p>
+          <h1>Sign in</h1>
+          <p>Administrator access</p>
+        </div>
+        <div className="signinPanel">
+          <LoginForm />
+        </div>
       </div>
     </div>
   );

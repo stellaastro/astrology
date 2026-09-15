@@ -80,11 +80,17 @@ export default async function ConfirmPage({
   const copy = COPY[outcome];
 
   return (
-    <div className="page" lang="en">
+    <>
+      <div className="masthead" lang="en">
+        <div className="wrap">
+          <p className="eyebrow">Waitlist</p>
+          <h1 className="pageTitle">{copy.title}</h1>
+          <p className="pageLede">{copy.lede}</p>
+        </div>
+      </div>
+
+      <div className="page" lang="en">
       <div className="wrap">
-        <p className="eyebrow">Waitlist</p>
-        <h1 className="pageTitle">{copy.title}</h1>
-        <p className="pageLede">{copy.lede}</p>
 
         <p className="pageActions">
           <Link className="btn" href="/">Back to home</Link>
@@ -95,6 +101,7 @@ export default async function ConfirmPage({
 
         {copy.note ? <p className="pageNote">{copy.note}</p> : null}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

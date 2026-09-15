@@ -1,33 +1,44 @@
 /* Admin sign-in. Same tokens as the public site — one design system, two
-   surfaces (ADR-002). */
+   surfaces (ADR-002).
 
-.form { max-width: 24rem; margin-top: var(--s4); }
+   The form now lives inside .signinPanel, so it fills its container instead of
+   carrying its own 24rem cap and floating in an empty field. */
+
+.form { margin-top: 0; }
 .field { margin-bottom: var(--s3); }
 
 .label {
   display: block;
-  margin-bottom: .4rem;
+  margin-bottom: .45rem;
   font-size: var(--step--1);
+  font-weight: 500;
+  letter-spacing: .02em;
   color: var(--ink);
 }
 
 .input {
   width: 100%;
-  min-height: var(--tap);
-  padding: .55rem .8rem;
+  min-height: 48px;
+  padding: .6rem .85rem;
   border: 1px solid var(--ink-soft);
   border-radius: var(--radius);
-  background: var(--surface-2);
+  /* The panel is --surface-2, so the field steps DOWN to --surface to stay
+     distinguishable from it. Same two tokens, opposite roles from before. */
+  background: var(--surface);
   color: var(--ink);
   font-family: var(--font-body);
   font-size: var(--step-0);
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
+.input:hover { border-color: var(--ink); }
 .input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 
 .submit {
-  min-height: var(--tap);
+  width: 100%;
+  min-height: 48px;
   padding: 0 1.35rem;
+  letter-spacing: .02em;
   border: 1px solid var(--cta);
   border-radius: var(--radius);
   background: var(--cta);
@@ -37,7 +48,10 @@
   cursor: pointer;
 }
 
-.submit:hover:not(:disabled) { background: var(--cta-hover); }
+.submit:hover:not(:disabled) {
+  background: var(--cta-hover);
+  border-color: var(--cta-hover);
+}
 .submit:disabled { cursor: default; opacity: .7; }
 .submit:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
@@ -50,19 +64,29 @@
 }
 
 .or {
-  max-width: 24rem;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
   margin: var(--s3) 0;
   color: var(--ink-soft);
   font-size: var(--step--1);
-  text-align: center;
 }
+/* Gold hairlines either side, tapering away from the word. Gradients are
+   explicitly permitted for gold; `transparent` rather than a hand-written
+   rgba so a palette change carries through. */
+.or::before, .or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+}
+.or::before { background: linear-gradient(90deg, transparent, var(--accent)); }
+.or::after  { background: linear-gradient(90deg, var(--accent), transparent); }
 
 .google {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--tap);
-  max-width: 24rem;
+  min-height: 48px;
   width: 100%;
   padding: 0 1.35rem;
   border: 1px solid var(--rule);
@@ -74,11 +98,12 @@
 }
 
 .google:visited { color: var(--ink); }
-.google:hover { background: var(--cream); }
+.google:hover { background: var(--cream); border-color: var(--ink-soft); }
 
 .note {
-  max-width: 24rem;
-  margin: var(--s2) 0 0;
+  margin: var(--s3) 0 0;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
   color: var(--ink-soft);
   font-size: var(--step--1);
 }

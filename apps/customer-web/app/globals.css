@@ -16,6 +16,33 @@
 /* Body is Mukta for BOTH scripts — it is a Devanagari+Latin superfamily, so
    there is no :lang() switch here any more (ADR-035). Only display type
    switches by script, below. */
+/* The botanical watermark (DESIGN.md §1, "Background treatment"). It was
+   specified from the start and never built, which is the single biggest reason
+   every page below the hero read as one flat ivory field.
+
+   Fixed rather than scrolling: the ground stays still while content moves over
+   it, which is what makes it read as a printed stock rather than as wallpaper.
+   Held at 6% — the rule is "under roughly 6% effective contrast against
+   --surface", because the measured ratios in DESIGN.md assume a FLAT ground
+   and a busy watermark quietly invalidates every one of them.
+
+   Sections with their own background (cream, dark) paint over it. That is
+   deliberate: those are content surfaces and they are meant to read as solid. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image: url("/botanical.svg");
+  background-size: 200px 200px;
+  opacity: .06;
+  pointer-events: none;
+}
+
+/* Everything real sits above the watermark. Without this the fixed layer would
+   paint over the page instead of under it. */
+body > * { position: relative; z-index: 1; }
+
 body {
   margin: 0;
   background: var(--surface);
@@ -234,17 +261,27 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
   list-style: none;
   counter-reset: step;
 }
+/* The counter is POSITIONED, not a grid track, and that is the fix rather than
+   the style. As a two-track grid, every extra child of the <li> became its own
+   grid item: a bare text node beside the <b> landed in the 3rem counter track
+   and rendered 80px wide, one word per line, live on production. Grid counts
+   children, including anonymous text nodes, which is exactly what makes the
+   mistake invisible in the CSS.
+
+   Absolute positioning takes the child count out of the layout altogether, so
+   the section cannot break again the next time someone edits the copy. */
 .steps li {
   counter-increment: step;
-  display: grid;
-  grid-template-columns: 3rem 1fr;
-  gap: var(--s3);
-  padding-block: var(--s3);
+  position: relative;
+  padding: var(--s3) 0 var(--s3) 3.9rem;
   border-top: 1px solid var(--rule);
   color: var(--ink-soft);
 }
 .steps li::before {
   content: counter(step, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: var(--s3);
   font-family: var(--font-display-lat);
   font-size: var(--step-2);
   color: var(--ink-soft);   /* gold would be 2.31:1 — never text */
@@ -254,7 +291,7 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
 
 @media (max-width: 860px) {
   .term { grid-template-columns: 1fr; gap: var(--s1); }
-  .steps li { grid-template-columns: 2.5rem 1fr; gap: var(--s2); }
+  .steps li { padding-left: 3rem; }
 }
 
 /* The mobile nav bar is fixed over the page, so the footer needs room to clear
@@ -262,4 +299,221 @@ footer .brand b, footer .brand i { color: var(--dark-text); }
    SiteNav.module.css: CSS Modules rejects a bare element selector. */
 @media (max-width: 860px) {
   footer { padding-bottom: calc(var(--s5) + 64px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BANDS, ORNAMENT AND MASTHEADS
+
+   The page used to be one flat ivory field from the hero to the footer, with
+   hairlines as its only structure. Everything below gives it rhythm, using
+   only what DESIGN.md already sanctions: lotus cream and deep umber as
+   content surfaces, and gold strictly as ornament.
+
+   ON GOLD: DESIGN.md §1 says gold "becomes permissible for text and buttons"
+   on dark. The contrast lint is stricter — it bans color/background
+   var(--accent) everywhere — and NOTHING HERE WEAKENS IT. Gold appears only
+   as gradients, borders and SVG stroke, all of which the lint permits by
+   design. Two measurements are why that is the right call rather than a
+   compromise:
+     - gold on --dark-panel is 4.43:1, which FAILS AA. "Gold is fine on dark"
+       is true of --dark-ground (5.51:1) and false one shade along.
+     - terracotta on --dark-ground is 2.27:1, so the normal CTA cannot survive
+       a dark band at all. On dark, the button inverts to ivory (12.75:1).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Band surfaces ───────────────────────────────────────────── */
+.band-cream { background: var(--cream); }
+
+.band-dark {
+  background: var(--dark-ground);
+  color: var(--dark-soft);
+}
+.band-dark h1, .band-dark h2, .band-dark h3 { color: var(--dark-text); }
+.band-dark .sechead p { color: var(--dark-soft); }
+.band-dark .person { border-top-color: var(--dark-border); }
+.band-dark .person span { color: var(--dark-muted); }
+.band-dark .person p { color: var(--dark-soft); }
+
+/* A dark band needs its own texture or it reads as a flat slab. Same asset,
+   so there is one watermark in the project rather than a light and a dark
+   copy that drift apart. */
+.band-dark, .band-cream { position: relative; overflow: hidden; }
+.band-dark::before, .band-cream::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("/botanical.svg");
+  background-size: 200px 200px;
+  pointer-events: none;
+}
+/* These three numbers are solved, not judged by eye, and the dark one is the
+   opposite of what intuition suggests. DESIGN.md caps the watermark at roughly
+   6% effective contrast against its ground. Measured as gold composited over
+   each surface:
+       ivory  @ .06 -> 4.8%
+       cream  @ .05 -> 3.1%
+       umber  @ .03 -> 5.2%    (@ .07 it was 12.7% — over double the cap)
+   Gold gains far more relative contrast on umber than on ivory, so a dark band
+   needs LESS than half the opacity, not more. Eyeballing it gave .10 and then
+   .07, and both were still out of spec. */
+.band-dark::before  { opacity: .03; }
+.band-cream::before { opacity: .05; }
+.band-dark > *, .band-cream > * { position: relative; z-index: 1; }
+
+/* Hairline seams between bands, so a surface change reads as intentional
+   rather than as a rendering artefact. */
+.band-cream, .band-dark { border-block: 1px solid var(--rule); }
+
+/* ── Section headings ────────────────────────────────────────── */
+/* A tapered gold rule above every section heading. This is the brand's
+   structural device doing the work that a heavier ornament would do worse —
+   and `transparent` rather than a hand-written rgba, so a palette change
+   carries through and the lint has nothing to catch. */
+.sechead { max-width: 42rem; }
+.sechead::before {
+  content: "";
+  display: block;
+  width: 108px;
+  height: 2px;
+  margin-bottom: var(--s3);
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+.sechead h2 { font-size: var(--step-4); letter-spacing: .01em; }
+.sechead p { font-size: var(--step-1); max-width: 40rem; }
+
+/* ── Interior page masthead ──────────────────────────────────── */
+/* /kundli, /confirm and /admin/login opened with an eyebrow and an H1 floating
+   at the top-left of an empty field, which is what made them read as
+   unfinished. A cream masthead gives the page a head and a body. */
+.masthead {
+  position: relative;
+  overflow: hidden;
+  background: var(--cream);
+  border-bottom: 1px solid var(--rule);
+  padding-block: var(--s5);
+}
+.masthead::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("/botanical.svg");
+  background-size: 200px 200px;
+  opacity: .06;
+  pointer-events: none;
+}
+.masthead > * { position: relative; z-index: 1; }
+.masthead .eyebrow { color: var(--leaf); }        /* 4.89:1 on cream — measured */
+.masthead .pageTitle { margin-bottom: var(--s2); }
+.masthead .pageLede { color: var(--ink-soft); }   /* 6.05:1 on cream — measured */
+
+/* The masthead carries the page title, so the body below starts closer. */
+.masthead + .page, .masthead + section { padding-top: var(--s5); }
+
+/* ── Panels ──────────────────────────────────────────────────── */
+/* DESIGN.md §4 says cards must earn their existence by BEING the interaction.
+   A sign-in form and a waitlist form qualify; a paragraph in a box does not. */
+.panel {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 32px rgba(0, 0, 0, .05);
+}
+
+@media (max-width: 860px) {
+  .panel { padding: var(--s3); }
+  .sechead::before { width: 78px; }
+}
+
+/* ── Sign-in ─────────────────────────────────────────────────────
+   /admin/login was a bare 24rem form floating at the top-left of an empty
+   ivory field. It is a threshold — the one page whose whole job is to feel
+   like a front door — so it gets the inverted surface and the brand mark, and
+   the form becomes a panel that has plainly earned being one.
+
+   The form sits INSIDE an ivory panel rather than directly on the umber, which
+   is what keeps the normal terracotta CTA valid (5.84:1 on --surface-2). Put
+   that button straight onto the dark ground and it would be 2.27:1 — the panel
+   is carrying the contrast here, so it is structural, not decoration. */
+.signin {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: var(--s6) var(--s3);
+  background: var(--dark-ground);
+}
+.signin::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("/botanical.svg");
+  background-size: 200px 200px;
+  opacity: .03;   /* see the note on .band-dark — 5.2% on umber */
+  pointer-events: none;
+}
+.signinInner {
+  position: relative;
+  z-index: 1;
+  width: min(29rem, 100%);
+}
+.signinHead { text-align: center; margin-bottom: var(--s4); }
+.signinHead img {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  margin-bottom: var(--s3);
+}
+.signinHead .eyebrow { color: var(--dark-muted); margin-bottom: var(--s1); }
+.signinHead h1 {
+  font-size: var(--step-4);
+  color: var(--dark-text);
+  margin-bottom: var(--s1);
+}
+.signinHead p {
+  margin: 0;
+  color: var(--dark-soft);
+  font-size: var(--step--1);
+}
+/* The panel lifts off the dark ground. Greyscale shadow — it is a scrim, not
+   a brand colour, which is the rule the rgba lint enforces. */
+.signinPanel {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .30);
+}
+
+@media (max-width: 860px) {
+  .signin { padding: var(--s5) var(--s3); }
+  .signinPanel { padding: var(--s3); }
+  .signinHead img { width: 58px; height: 58px; }
+}
+
+/* The waitlist is the one thing the page can actually DO today, so it gets a
+   panel and a width that keeps the field comfortable rather than page-wide. */
+.waitlistPanel { max-width: 34rem; }
+
+/* ── Focus rings on dark surfaces ────────────────────────────────
+   The global ring is `3px solid var(--ink)`, and --ink is #48251C — the SAME
+   VALUE as --dark-ground. So on any dark surface the focus ring was drawn in
+   the background colour and was completely invisible. That was already true of
+   the footer's email link on production, and adding dark bands would have
+   spread it.
+
+   DESIGN.md §8 lists visible focus as required, not aspirational, so this is a
+   correctness fix rather than polish. Ivory on umber is 12.75:1. */
+footer :focus-visible,
+.band-dark :focus-visible,
+.signin :focus-visible {
+  outline-color: var(--dark-text);
+}
+
+/* ...except inside a panel, which is an ivory island ON the dark ground. An
+   ivory ring there would be the same bug mirrored, so it goes back to ink.
+   Must stay AFTER the rule above: equal specificity, so source order decides. */
+.panel :focus-visible,
+.signinPanel :focus-visible {
+  outline-color: var(--ink);
 }

@@ -34,11 +34,15 @@ export default function Home() {
           grid — DESIGN.md §5 names that grid as the single most recognisable
           AI-generated layout.
 
+          On lotus cream, so the page changes surface immediately after the
+          hero instead of running one ivory field to the footer. Text on cream
+          is measured, not assumed: --ink 10.49:1, --ink-soft 6.05:1.
+
           Everything here is settled architecture (ADR-023 pay-at-booking,
           ADR-024 slot-based). What is deliberately absent is the price and the
           refund policy: those are owner decisions (O3, O4) and inventing either
           is exactly what §13 forbids. */}
-      <section id="terms">
+      <section id="terms" className="band-cream">
         <div className="wrap">
           <div className="sechead">
             <h2>शुल्क कैसे लगेगा</h2>
@@ -95,27 +99,52 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Each <li> wraps its content in a single <div>, and that is
+              load-bearing rather than tidiness. `.steps li` is a two-track
+              grid; a bare text node beside the <b> becomes a THIRD grid item
+              and lands in the 3rem counter track on the next row. It rendered
+              80px wide — one word per line — and shipped that way, because the
+              CSS reads perfectly correctly. Same failure as the `order` bug in
+              DESIGN.md §5: only visible when rendered. */}
           <ol className="steps">
             <li lang="en">
-              <b>Choose your astrologer.</b> Each one is named, with their
-              experience and the languages they speak.
+              <div>
+                <b>Choose your astrologer.</b> Each one is named, with their
+                experience and the languages they speak.
+              </div>
             </li>
             <li lang="en">
-              <b>Pick a time that suits you.</b> You see their actual
-              availability and choose a slot, rather than waiting for a callback.
+              <div>
+                <b>Pick a time that suits you.</b> You see their actual
+                availability and choose a slot, rather than waiting for a
+                callback.
+              </div>
             </li>
             <li lang="en">
-              <b>Pay for that slot.</b> The amount is shown before you confirm.
+              <div>
+                <b>Pay for that slot.</b> The amount is shown before you
+                confirm.
+              </div>
             </li>
             <li lang="en">
-              <b>Speak at the appointed time.</b> The consultation happens in
-              your browser — nothing to install.
+              <div>
+                <b>Speak at the appointed time.</b> The consultation happens in
+                your browser — nothing to install.
+              </div>
             </li>
           </ol>
         </div>
       </section>
 
-      <section id="astrologers">
+      {/* The founders sit on deep umber. This is the emotional centre of the
+          page — three named people who are the entire product — and inverting
+          the surface is what makes three of them read as an editorial choice
+          rather than as an empty marketplace (DESIGN.md §5).
+
+          Note what is NOT here: no gold text and no terracotta button. Gold on
+          umber is 5.51:1 and would pass, but the contrast lint bans gold as
+          text everywhere and that gate is worth more than the flourish. */}
+      <section id="astrologers" className="band-dark">
         <div className="wrap">
           <div className="sechead">
             <h2>हमारे संस्थापक ज्योतिषी</h2>
@@ -152,7 +181,12 @@ export default function Home() {
               not for any other reason.
             </p>
           </div>
-          <WaitlistForm />
+          {/* A panel, because DESIGN.md §4's test for one is that the card IS
+              the interaction — which a form is, and a paragraph in a box is
+              not. It also stops the fields floating loose on the page ground. */}
+          <div className="panel waitlistPanel">
+            <WaitlistForm />
+          </div>
         </div>
       </section>
     </>
