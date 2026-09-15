@@ -13,27 +13,45 @@ const ulid = monotonicFactory();
  * people must re-accept, and a deliberate rewording look like nothing happened
  * if the hash were cached.
  *
- * `recording` is its own policy, not a line inside `terms`. DPDP consent must
- * be specific: one checkbox covering terms, privacy and being recorded cannot
- * show which of the three a person agreed to, and being recorded is the one
- * most likely to be questioned.
+ * The two keys mirror the two checkboxes the terms specify, and no more.
+ * Recording consent is NOT one of them — it is collected per consultation
+ * (ADR-048), on the terms' own instruction.
  */
 export const POLICIES = {
+  /** Includes the 18+ affirmation — one checkbox, per the supplied wording. */
   terms: 'v1',
-  privacy: 'v1',
-  recording: 'v1',
+  /** The separate "processing information I provide for consultations" box. */
+  consultationData: 'v1',
 } as const;
 
 export type PolicyKind = keyof typeof POLICIES;
 
-/** Required before an account exists. Recording is listed among them. */
-export const REQUIRED_AT_REGISTRATION: PolicyKind[] = ['terms', 'privacy', 'recording'];
+/**
+ * The two boxes at registration, exactly as the terms specify them:
+ *
+ *   1. 18+ and agreement to the Terms and Privacy Policy
+ *   2. consent to processing information provided for consultations
+ *
+ * RECORDING IS DELIBERATELY NOT HERE. The terms themselves say so:
+ *
+ *   "Where call recording is applicable, appropriate recording notice and
+ *    consent should be presented separately at or before the consultation
+ *    rather than relying solely upon acceptance of these general Terms."
+ *
+ * An earlier draft of this file put `recording` in this list, following an
+ * instruction to capture it at registration. The document supplied afterwards
+ * contradicts that, and the document is right: a blanket acceptance buried in
+ * general terms is weak consent for something as sensitive as recording
+ * someone's voice. Per-consultation consent is RecordingConsent (ADR-048).
+ */
+export const REQUIRED_AT_REGISTRATION: PolicyKind[] = ['terms', 'consultationData'];
 
 /**
  * Policy acceptance (ADR-050).
  *
  * Owner decision, 2026-09-15: the terms are shown as an itemised list before an
- * account is created, and consent to being recorded is one of those items.
+ * account is created. The supplied document (docs/legal/customer-terms-v1.md)
+ * defines exactly two boxes, and recording is not one of them.
  */
 @Injectable()
 export class PolicyService {

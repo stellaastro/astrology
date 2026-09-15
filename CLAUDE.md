@@ -153,10 +153,16 @@ price snapshot; never read a past booking's price back through
 
 **Still open in Phase 2:**
 
-- **2.8 legal pages — PARKED by the owner.** This is the Razorpay unblocker, and
-  it needs CIN (`U96906MP2026PTC085281`), GSTIN, the registered office, a
-  grievance officer, and the O4 refund policy. Do not write any of it from
-  invention.
+- **2.8 legal pages — customer Terms SUPPLIED 2026-09-15**, stored at
+  `docs/legal/customer-terms-v1.md`. **Still not publishable.** The placeholders
+  are unfilled (effective date, grievance officer, entity name, registered
+  address, grievance email) and the IT Rules require a named grievance officer.
+  **Three clauses describe a product this codebase does not build** — §7/§9
+  per-minute billing (ADR-024 is slot-based), §8 a prepaid wallet (ADR-023 has
+  none), §3 mobile/OTP registration (ADR-037 is Google sign-in). A terms page is
+  a promise to a customer; describing billing that does not happen is a
+  misdescription. See `docs/legal/README.md`. Still needs GSTIN and the O4
+  refund policy.
 - 2.14 referral codes · 2.15 a real transactional email provider · 2.16 signup
   counters. All P2.
 
