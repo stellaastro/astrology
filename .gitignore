@@ -117,3 +117,11 @@ images/celestial/*
 !images/celestial/PROMPT.md
 
 !images/celestial/separated-sheet.png
+
+# OAuth client secret files downloaded from Google Cloud Console. One landed in
+# docs/ on 2026-09-15 and was caught before it was committed; this makes the
+# next one impossible rather than lucky. Real values live in
+# /home/stellaastro/secrets/.
+client_secret_*.json
+*-oauth-client.json
+firebase-adminsdk*.json
