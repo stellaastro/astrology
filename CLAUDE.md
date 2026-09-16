@@ -97,8 +97,8 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 5 — availability. 5.1 and 5.2 done; 5.3 waits for Phase 6.**
-Build order:
+**Phase 5 — availability. NOT complete: 5.1 is API-only, 5.3 is open.**
+Phase 6 has its schema and nothing else. Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -146,6 +146,23 @@ controls that do nothing.
 widens the stride, never the session — billing is per slot, so a buffer that
 lengthened the session would overcharge. Overlapping windows are refused in the
 service because MySQL has no exclusion constraints.
+
+### Phase 5 status — audited 2026-09-16, NOT complete
+
+| | State |
+|---|---|
+| **5.1** weekly grid + blocks | **API done, NO UI.** `/astrologer` still says availability is "being built", so a practitioner cannot set their own hours — only an admin can, by calling the endpoint. This is also 4.2's deferred "availability editor" |
+| **5.2** inter-slot buffers | **Done** |
+| **5.3** shrink must not orphan paid bookings | **NOT done, and NO LONGER BLOCKED.** It was deferred because no booking model existed; one does now. `availability.service` mentions bookings only in comments — `replaceRules` and `addBlock` will happily delete the hours a paid booking sits in |
+
+### Phase 6 status — schema only
+
+6.1–6.5 are the schema and are done and verified (generated column, durable
+hold columns, idempotency key, price snapshot and tax columns, UTC slots).
+**There is no bookings module, no service and no endpoint** — nothing can
+create a booking. 6.6 reschedule, 6.7 overrun policy, 6.8 no-show detector and
+6.10 the reaper are all unbuilt. 6.9's four-eyes exists only for *abuse review*
+(ADR-049), not for no-show or refund adjudication. 6.11 waits on TRAI DLT.
 
 **The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
 price snapshot; never read a past booking's price back through
