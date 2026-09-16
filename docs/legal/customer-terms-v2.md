@@ -132,16 +132,28 @@ STELLA may verify certain information supplied by Astrologers, but such verifica
 
 Different Astrologers may charge different consultation rates.
 
-**Consultations are charged by the appointment, not by the minute and not by the message.** A booked thirty-minute appointment is charged as a thirty-minute appointment, whether it is held by voice or by chat.
+**Voice consultations are charged by the appointment.** A booked thirty-minute voice appointment is charged as a thirty-minute appointment.
+
+**Chat consultations are charged by the minute**, at the rate shown for that Astrologer, and are subject to a maximum duration. Before a chat consultation is booked the Customer is shown the per-minute rate, the maximum duration, and **the most that can possibly be charged**. The Customer is charged only for the time the meter recorded, never more than the maximum shown.
 
 The Astrologer, the appointment time, the appointment length and the total amount payable are displayed before the Customer confirms and pays for the booking.
 
-Because charging is by the appointment:
+**For a voice consultation**, because charging is by the appointment:
 
 * no per-minute meter runs during the consultation;
-* a pause in the conversation is not charged separately;
-* in a chat consultation, the number of messages sent does not change the price; and
+* a pause in the conversation is not charged separately; and
 * a consultation that ends earlier than the booked appointment length is not charged less, and a Customer is not entitled to a partial refund on that basis alone.
+
+**For a chat consultation**, the following rules apply to the meter and are applied automatically:
+
+* **The meter starts when the Astrologer sends their first message**, not when the appointment time arrives and not when the Customer opens the chat. A Customer waiting for the Astrologer to appear is not charged for that wait.
+* **Time is charged by the total, rounded up to the next whole minute once** at the end of the consultation — not separately for each message or exchange.
+* **A minimum of one minute** is charged for any consultation in which the Astrologer replied.
+* **A pause of up to two minutes is charged**, because reading and composing a reply is part of the consultation. **Silence beyond two minutes is not charged**, so a Customer who stops replying is not billed for the time they were away.
+* **A brief loss of connection does not stop the meter**, so that a consultation is not ended by an ordinary mobile network interruption.
+* **The number of messages sent does not change the price.**
+
+Where the Astrologer never replies, no charge is made.
 
 Where a consultation is affected by a verified Platform or communication failure, the Customer may raise a billing dispute under clause 18.
 
@@ -151,7 +163,9 @@ Applicable taxes, payment processing charges or other permitted charges may be a
 
 **STELLA does not operate a wallet and does not hold Customer funds.** There is no prepaid balance to load, maintain, top up or withdraw.
 
-Each consultation is paid for at the time it is booked. Payment is taken in full when the Customer confirms the booking, through STELLA's payment gateway provider, so that nothing remains owing after the consultation.
+**For a voice consultation**, payment is taken in full when the Customer confirms the booking, through STELLA's payment gateway provider, so that nothing remains owing afterwards.
+
+**For a chat consultation**, the amount is not known until the consultation ends. When the booking is confirmed, STELLA's payment gateway provider authorises the maximum amount shown to the Customer. When the consultation ends, **only the metered amount is taken**, and the remainder of the authorisation is released. A Customer is never charged more than the maximum displayed before booking.
 
 A booking is confirmed only once payment has succeeded. Where payment does not complete, the appointment time is released and remains available to other Customers.
 
@@ -174,7 +188,9 @@ Customers should review the appointment details and the amount payable before co
 
 A chat consultation is a written conversation with a named human Astrologer, held during a booked appointment.
 
-**A chat consultation is charged by the appointment, in the same way as a voice consultation (clause 7).** The number of messages sent does not change the price, and there is no separate per-message or per-minute charge.
+**A chat consultation is charged by the minute** at the rate displayed for that Astrologer, under the metering rules set out in clause 7. The number of messages sent does not change the price.
+
+Every chat consultation has a **maximum duration**, displayed before booking together with the per-minute rate and the maximum total charge. The consultation ends when that maximum is reached. The Customer is charged only for metered time.
 
 The chat becomes available at the start of the booked appointment and closes at the end of it. Messages sent within the session are delivered through the Platform; Customers and Astrologers should not move the conversation to another channel (clause 16).
 
@@ -443,8 +459,8 @@ By creating an account and using STELLA, you acknowledge that:
 2. Astrological predictions and interpretations are not guaranteed.
 3. Astrologers' opinions are their own.
 4. Astrology is not a substitute for medical, legal, financial or other regulated professional advice.
-5. Consultations are charged by the booked appointment rather than by the minute, at the amount displayed before you pay.
-6. Payment is taken when you book. STELLA does not operate a wallet and does not hold your funds.
+5. Voice consultations are charged by the booked appointment. Chat consultations are charged by the minute, subject to a maximum duration and a maximum total charge, both displayed before you book; you are charged only for metered time.
+6. Payment for a voice consultation is taken when you book. For a chat consultation the maximum is authorised when you book and only the metered amount is taken at the end. STELLA does not operate a wallet and does not hold your funds.
 7. Calls may be recorded, and chat consultations are stored as a written transcript, where this is disclosed to you and you have consented; that consent is asked for separately at or before the consultation.
 11. In a chat consultation you are writing to a named human Astrologer, not to automated software.
 8. You are responsible for decisions you make after receiving an astrology consultation.

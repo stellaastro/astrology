@@ -385,8 +385,12 @@ can still identify the site, the current section, and the primary action.
 - **The CTA must match what the page does.** While the site takes emails, the
   button says "be first to book", not "book a consultation". An earlier draft
   promised a calendar months before one would exist.
-- **Do not advertise per-minute billing.** Billing is slot-based (ADR-024).
-  "Pay only for what you used" is not true under this model.
+- **Do not advertise per-minute billing FOR VOICE.** Voice is slot-based
+  (ADR-024): "pay only for what you used" is not true of a voice consultation.
+  **Chat is per-minute** (ADR-052, owner decision 2026-09-16) and may be
+  described as such — but only alongside the maximum duration and the maximum
+  total charge, because a per-minute price with no visible ceiling is the shape
+  customers most reliably misread.
 - **Legal pages are English only.** Machine-translated regulated disclosure text
   is worse than English.
 - Placeholder content must look like a placeholder. `— वर्ष` and `₹— / 30 मिनट`

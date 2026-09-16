@@ -378,6 +378,22 @@ model Astrologer {
   sessionRatePaise Int? @map("session_rate_paise")
   sessionMinutes   Int  @default(30) @map("session_minutes")
 
+  /// PER-MINUTE rate for CHAT consultations (ADR-052). Integer paise.
+  ///
+  /// Separate from sessionRatePaise on purpose: voice is billed by the booked
+  /// appointment and chat by the minute, so they are two different prices and
+  /// one column could not hold both meanings. Null means this astrologer does
+  /// not take chat consultations.
+  chatRatePerMinutePaise Int? @map("chat_rate_per_minute_paise")
+
+  /// The longest a chat consultation with this astrologer may run.
+  ///
+  /// A cap is not a preference. Per-minute billing cannot be collected at
+  /// booking because the amount is unknown then, and with no wallet (ADR-023)
+  /// the only alternative is authorising a maximum up front and capturing the
+  /// actual — and an authorisation needs a number.
+  chatMaxMinutes Int @default(30) @map("chat_max_minutes")
+
   /// Minutes left free AFTER each session (task 5.2).
   ///
   /// Not cosmetic: Phase 6's overrun policy needs somewhere for a consultation
@@ -528,8 +544,22 @@ model Booking {
   /// PRICE SNAPSHOT, frozen at creation and never recomputed (§79). Reading
   /// the price back through astrologers.session_rate_paise would rewrite the
   /// price of every past booking the moment someone edits a rate.
+  ///
+  /// FOR A VOICE BOOKING this is the amount charged, known at booking.
+  /// FOR A CHAT BOOKING it is the AUTHORISED CEILING — the most the customer
+  /// can be charged — and the amount actually captured is computed from the
+  /// meter when the consultation ends (ADR-052). The two are the same number
+  /// only when a chat runs to its maximum.
   pricePaise     Int @map("price_paise")
   sessionMinutes Int @map("session_minutes")
+
+  /// The per-minute rate in force when this chat booking was made, frozen like
+  /// every other price (§79). Null for a voice booking.
+  chatRatePerMinutePaise Int? @map("chat_rate_per_minute_paise")
+
+  /// What was actually charged once the meter stopped. Null until then, and
+  /// null for ever on a voice booking, where pricePaise is already the answer.
+  capturedPaise Int? @map("captured_paise")
 
   /// TAX COLUMNS, present from THIS migration deliberately (task 6.4).
   ///
@@ -592,6 +622,23 @@ model Consultation {
   /// Join/leave is the only honest no-show signal (task 6.8).
   astrologerJoinedAt DateTime? @map("astrologer_joined_at")
   customerJoinedAt   DateTime? @map("customer_joined_at")
+
+  /// ── Chat metering (ADR-052) ────────────────────────────────────
+  /// Null for a voice consultation, which is billed by the appointment.
+
+  /// When the meter started: the ASTROLOGER'S FIRST MESSAGE, not the appointed
+  /// time and not when the customer opened the chat. A customer waiting for the
+  /// astrologer to appear is not receiving a consultation.
+  meterStartedAt DateTime? @map("meter_started_at")
+  meterStoppedAt DateTime? @map("meter_stopped_at")
+
+  /// Seconds actually charged, after excluding silence beyond the grace period.
+  /// Stored in SECONDS and rounded to minutes only when charging, so the
+  /// rounding happens once and can be re-checked against this number.
+  billableSeconds     Int? @map("billable_seconds")
+  /// Silence that was NOT charged. Kept so a billing query can be answered
+  /// with "you were charged for X and not for Y" rather than a bare total.
+  idleSecondsExcluded Int? @map("idle_seconds_excluded")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

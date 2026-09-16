@@ -2002,3 +2002,62 @@ consultation cannot happen without its messages being stored — the conversatio
 *is* the writing. So clause 12 tells a customer who does not want a written
 record to book a voice consultation and decline recording, instead of offering a
 consent that could not meaningfully be refused.
+
+---
+
+## ADR-052 — Chat is billed per minute, and the four questions that reopens
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Owner decision** · **Partially
+supersedes ADR-024** — for chat only. **Voice remains slot-based.**
+
+ADR-024 chose slot billing *because* per-minute metering leaves four questions
+open — prorating, start/stop, pause/reconnect and chat inactivity — and slot
+billing dissolves all four by construction. Per-minute for chat reopens them, so
+each is answered explicitly in `billing/chat-billing.ts`, with the reasoning
+next to the constant, rather than falling out of whatever the code happened to
+do.
+
+| Question | Answer | Why |
+|---|---|---|
+| **Start** | The **astrologer's first message** | A customer waiting for the astrologer to appear is not receiving a consultation. Starting at the appointed time would bill them for the wait |
+| **Prorating** | Total seconds, **rounded up once**, at the end | Rounding each exchange separately charges six minutes for six ten-second replies. The difference between "we round up" and "we round up repeatedly" |
+| **Inactivity** | Up to **2 minutes of silence is charged**; beyond that is not | Reading and composing a reply is the consultation. Billing an hour because someone walked away is the most-complained-about behaviour in per-minute chat |
+| **Reconnect** | A drop under **90 seconds** does not stop the meter | Mobile networks drop constantly; ending a consultation on every blip would be worse than the blip |
+
+A minimum of one minute applies where the astrologer replied. Where they never
+replied, **there is no charge at all** — not a minimum for silence.
+
+Every expectation in the tests is hand-computed per ADR-036, and the two that
+matter most were confirmed to fail against the wrong implementation: rounding
+each interval separately, and billing all silence.
+
+### The consequence nobody asked about, and it is the important one
+
+**Per-minute billing cannot be collected at booking time, because the amount is
+not known then.** ADR-023 removed the wallet, so there is no balance to draw
+down. That leaves exactly two options, and one of them is a reversal of ADR-023.
+
+The design adopted here is **authorise-then-capture**: every chat consultation
+has a **maximum duration**, the gateway authorises `maxMinutes × rate` when the
+booking is confirmed, and only the metered amount is captured at the end. The
+customer sees the rate, the cap, and the worst case before agreeing.
+
+That is why `chatMaxMinutes` is not a nicety — **an authorisation needs a
+number**, so an uncapped per-minute chat is not chargeable without a wallet.
+`authorisationCeilingPaise` refuses a zero or negative cap for that reason.
+
+`bookings.price_paise` therefore means two different things by modality: the
+amount charged for voice, the **authorised ceiling** for chat, with
+`captured_paise` holding what was actually taken. Both are frozen at creation
+(§79); neither is ever recomputed from the astrologer's current rate.
+
+**Still open, and it is an owner decision:** whether Razorpay's authorise-then-
+capture flow is acceptable for this volume, or whether a prepaid balance is
+preferred after all. A prepaid balance *is* a wallet and reverses ADR-023,
+which three plan reviews removed for its regulatory weight. This ADR assumes
+authorise-then-capture and does not implement either — payments are Phase 7.
+
+`DESIGN.md` §9 is narrowed accordingly: per-minute may now be advertised for
+chat, **but only alongside the maximum duration and the maximum total charge**,
+because a per-minute price with no visible ceiling is the shape customers most
+reliably misread.
