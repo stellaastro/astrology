@@ -97,9 +97,9 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 6 — booking. Holds, idempotency, reschedule and the reaper are done
-(ADR-054); no-show, overrun and four-eyes are not, and nothing can be CONFIRMED
-until Phase 7 pays for it.** Build order:
+**Phase 7 — payments. The Razorpay integration is BUILT but has never run
+against Razorpay: there is no test key and no webhook secret (see below).**
+Phase 6's no-show, overrun and four-eyes are still open. Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -198,6 +198,44 @@ is the only place a booking changes state.
   logged as a warning. An astrologer with `chatMaxMinutes` longer than
   `sessionMinutes` is misconfigured; the admin form should refuse it at the
   source.
+
+### Phase 7 status — built, unproven, and blocked on the owner
+
+**Built (ADR-055):** the `PaymentsProvider` seam, the Razorpay adapter, order
+creation, webhook signature verification, replay protection, capture, and the
+GST split. 468 tests; 13 mutations each caught.
+
+**NOT ONE REQUEST HAS REACHED RAZORPAY.** A green test proves the code, not the
+integration. 7.1 does not pass until an order is created and a webhook is
+received against a real test account.
+
+**Three owner actions block it, and all three are quick:**
+
+1. **Get a TEST key pair** — Dashboard → Settings → API Keys → **Test Mode**.
+   `config.txt` holds only `rzp_live_…`, and `RazorpayService` **refuses to
+   boot** with a live key unless `APP_ENV=production`. That refusal is
+   deliberate: a live key works perfectly in development, and the first
+   successful local test would be a real charge on a real card.
+2. **Create a webhook and record its secret** — Dashboard → Settings →
+   Webhooks, pointing at `/api/v1/payments/razorpay/webhook`, subscribing to
+   `payment.authorized` and `payment.failed`. Without
+   `RAZORPAY_WEBHOOK_SECRET` no signature can be checked, and the verifier
+   **fails closed** — every webhook is rejected.
+3. **O6, with the CA** — the GST rate, the SAC code, and principal-versus-agent.
+   `GST_RATE_BP` / `GST_SAC_CODE` / `GST_PLACE_OF_SUPPLY` have **no defaults**
+   and the API refuses to create an order without them, deliberately: an
+   invented tax split on a real invoice is a filing problem, not a bug.
+
+**Still unrotated: O1.** `RAZOR_LIVE_KEY` and `RAZOR_LIVE_SECRET` in
+`config.txt` are the same pair that sat in the web docroot.
+`docs/architecture/CREDENTIAL_ROTATION.md` still reads "DEFERRED by owner
+decision, 2026-09-06. Nothing in this runbook has been carried out." Rotating
+before the account ever charges a card is free; after it is not.
+
+**Still open in Phase 7:** 7.3 the refund path (needs O4, and the economics
+modelled — the gateway fee on the original payment is generally not returned,
+and refunds draw against a settlement balance at T+2/T+3), and 7.4 daily
+reconciliation.
 
 **The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
 price snapshot; never read a past booking's price back through

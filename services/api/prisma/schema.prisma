@@ -571,6 +571,17 @@ model Booking {
   /// null for ever on a voice booking, where pricePaise is already the answer.
   capturedPaise Int? @map("captured_paise")
 
+  /// The gateway's order id — created when the customer starts checkout, and
+  /// the only thread tying Razorpay's record to ours. UNIQUE: one order belongs
+  /// to exactly one booking, or a bug that reused an order would confirm
+  /// whichever booking the webhook happened to find first.
+  razorpayOrderId String? @unique @map("razorpay_order_id") @db.VarChar(64)
+
+  /// The payment that paid for it. UNIQUE so that a replayed webhook cannot
+  /// apply twice even if the event-id deduplication fails — the database says
+  /// it independently of the application.
+  razorpayPaymentId String? @unique @map("razorpay_payment_id") @db.VarChar(64)
+
   /// TAX COLUMNS, present from THIS migration deliberately (task 6.4).
   ///
   /// Under pay-at-booking the invoice is issued at booking, and adding a tax

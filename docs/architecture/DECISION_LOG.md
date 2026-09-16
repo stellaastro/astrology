@@ -2267,3 +2267,127 @@ to the public list and was rebooked.
 
 The audit rows carry ids, times and amounts and no personal data (ADR-040),
 checked against the test accounts' addresses.
+
+---
+
+## ADR-055 — Razorpay: authorise, check, then capture. And the live key stays out of development
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Covers:** tasks 7.1, 7.2 (partial)
+
+The owner pointed at `config.txt` for the Razorpay credentials. What is in it is
+`RAZOR_MID`, `RAZOR_LIVE_KEY` (`rzp_live_…`), `RAZOR_LIVE_SECRET` and a
+reference to `rzp-key.csv` that is not on this machine. **There is no test key
+and no webhook secret**, and per `CREDENTIAL_ROTATION.md` the live pair is still
+the one that was exposed in the web docroot — rotation was deferred by owner
+decision on 2026-09-06 and has never been carried out.
+
+### The live-key guard is the most important thing in this work
+
+`RazorpayService` refuses to construct with an `rzp_live_` key unless
+`APP_ENV=production`, and refuses an `rzp_test_` key in production.
+
+The first direction is the one that does damage. Every payment integration gets
+built by making it work locally first, and "make it work locally" with the only
+key on hand means the first successful test is a real charge on a real card, the
+first bug is a real double charge, and the first cleanup is a real refund with a
+gateway fee that is not returned. **A live key works perfectly in development**,
+which is precisely why nothing else would catch it. Same posture as the
+`is_dev_fixture` boot guard: downtime over contaminated data, except here the
+contamination is somebody's bank statement.
+
+An **unprefixed** key is allowed through. Razorpay has used other formats, and a
+guard that refuses an unrecognised shape is one that takes the site down over a
+vendor naming change. Only a key that positively identifies itself as belonging
+elsewhere is refused.
+
+### Authorise, check the slot, then capture
+
+Orders are created with `payment_capture: 0`, so an authorised payment is money
+**reserved**, not money **taken**.
+
+That matters because a hold can lapse while the customer is inside a banking
+app. With auto-capture the outcome is "charged, then refunded, minus a gateway
+fee that is not returned". Without it, the webhook arrives, the server sees the
+booking is no longer `held`, declines to capture, and the authorisation lapses —
+**the customer is never charged at all**. The difference is one flag.
+
+It is also the mechanism ADR-052 needs for chat, where the authorised amount is
+a ceiling and the captured amount comes from the meter.
+
+**Capture happens before confirm**, and the order is not arbitrary. Capture is
+the step that can fail. Confirming first would leave a booking marked paid with
+no money behind it, and that row is indistinguishable from a genuinely paid one
+for ever afterwards. The other way round the worst case is money taken with the
+booking still `held` — which the audit trail shows and a human can resolve.
+
+### What is never trusted
+
+The webhook's **amount** is checked against the price *we* froze at booking, and
+a mismatch refuses rather than reconciles. A signature proves the message came
+from Razorpay; it does not prove the message agrees with our own record.
+
+Order of operations in the handler is itself the security property: verify the
+signature over the **raw body**, before parsing, before any lookup, before
+touching the database — then deduplicate on the gateway's event id, then act. A
+forged `payment.authorized` would confirm a booking nobody paid for.
+
+The raw body matters concretely. Re-serialising parsed JSON changes whitespace
+and key order, the signature stops matching for reasons unrelated to
+authenticity, and the usual response to that is to stop checking. `main.ts` now
+boots with `rawBody: true`.
+
+### 7.2 — the tax split refuses rather than guesses
+
+`splitInclusive` treats the price as **tax-inclusive**, because that is what the
+customer was shown: ₹999 on the profile has to be ₹999 on the card statement.
+
+**The tax is a subtraction, not a second multiplication.** Computing both halves
+independently and rounding each lets them fail to sum to the price — off by a
+paisa on some prices and not others, which survives every manual check and then
+fails reconciliation at volume. Deriving one from the other makes
+`taxableValue + tax === price` true by construction, and a sweep asserts it.
+
+**The rate, the SAC code and principal-versus-agent have no defaults.** All
+three are owner action O6, with the CA, and `PaymentsService` refuses to create
+an order without them. An invented rate would be a wrong GST figure on a real
+invoice — a filing problem, not a bug, and uncorrectable on a paid row (§79).
+
+### Two things caught by running it rather than testing it
+
+**A dependency-injection failure that every unit test missed.** `RazorpayService`
+takes the environment as a constructor argument so it can be tested without
+mutating `process.env`. NestJS reads constructor parameter types from
+`emitDecoratorMetadata` and tries to resolve that `NodeJS.ProcessEnv` as a
+provider — **a default value does not stop it** — and the app died at boot with
+"can't resolve dependencies (?)". Every test passed throughout, because they
+construct the class directly and never go through the container. Fixed with a
+`useFactory`.
+
+**My first boot test proved nothing.** It asserted the process exited non-zero
+with a live key, and it did — because of the DI bug above, not the guard. Both
+the "refuses" cases and the "starts" control case failed identically. A guard
+test needs the control case to pass, or it is measuring whether the binary runs.
+
+### One property that a unit test cannot observe
+
+Replacing `timingSafeEqual` with `===` changes no observable behaviour — the
+same signatures pass and fail — so it was the sole survivor of thirteen
+mutations. What it changes is how long the comparison takes in proportion to how
+many leading bytes matched, which leaks enough to forge a signature given
+attempts. Timing measurements inside a test are far too noisy to assert on, so
+`timing-safe.spec.ts` asserts on the **mechanism** instead, mocking
+`node:crypto` to confirm the comparison routes through `timingSafeEqual`. That
+couples the test to the implementation deliberately: here the implementation is
+the requirement.
+
+### Verified
+
+Thirteen mutations, each removing one guard, each failing at least one test.
+Three boot cases against the real binary: a live key under development refuses
+and names the fix, a test key under production refuses, a test key under
+development starts.
+
+**Not verified, and cannot be until the owner acts:** no order has been created
+against Razorpay and no webhook has been received, because there is no test key
+and no webhook secret. Everything above is unit-verified and boot-verified.
+A green test is not evidence that the integration works.
