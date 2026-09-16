@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { monotonicFactory } from 'ulid';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService, type AuditActor } from '../audit/audit.service';
-import { generateSlots, rulesCollide, type Slot, type WeeklyRule } from './slots';
+import { generateSlots, isCovered, rulesCollide, type Block, type Slot, type WeeklyRule } from './slots';
 
 const ulid = monotonicFactory();
 
@@ -54,6 +54,57 @@ export class AvailabilityService {
     }
   }
 
+  /**
+   * Future bookings that these rules and blocks would no longer offer (5.3).
+   *
+   * "ALREADY PAID" IS THE LINE. A confirmed booking has been paid for, and a
+   * customer who paid for Tuesday 10:00 must not discover that the astrologer
+   * removed Tuesdays and nobody told either of them. A held booking is someone
+   * mid-checkout — worth reporting, but not worth blocking an astrologer from
+   * changing their own hours, since an unpaid hold lapses on its own.
+   *
+   * PAST BOOKINGS ARE IGNORED. A consultation that already happened cannot be
+   * orphaned by tomorrow's schedule, and refusing on those grounds would mean
+   * an astrologer could never change their hours again.
+   */
+  private async orphanedBy(
+    astrologerId: string,
+    rules: WeeklyRule[],
+    blocks: Block[],
+  ): Promise<{ confirmed: { id: string; slotStart: Date }[]; held: { id: string; slotStart: Date }[] }> {
+    const upcoming = await this.prisma.booking.findMany({
+      where: {
+        astrologerId,
+        status: { in: ['held', 'confirmed'] },
+        slotStart: { gte: new Date() },
+      },
+      select: { id: true, slotStart: true, slotEnd: true, status: true },
+    });
+
+    const confirmed: { id: string; slotStart: Date }[] = [];
+    const held: { id: string; slotStart: Date }[] = [];
+
+    for (const b of upcoming) {
+      if (isCovered(b.slotStart, b.slotEnd, rules, blocks)) continue;
+      (b.status === 'confirmed' ? confirmed : held).push({ id: b.id, slotStart: b.slotStart });
+    }
+    return { confirmed, held };
+  }
+
+  /** The same message wherever a change is refused, so it reads the same way. */
+  private static orphanRefusal(orphans: { id: string; slotStart: Date }[]): string {
+    const when = orphans
+      .slice(0, 5)
+      .map((o) => o.slotStart.toISOString())
+      .join(', ');
+    const more = orphans.length > 5 ? ` and ${orphans.length - 5} more` : '';
+    return (
+      `This change would leave ${orphans.length} paid booking(s) outside your ` +
+      `available hours: ${when}${more}. Reschedule or cancel them first — a ` +
+      `customer who has paid must not be silently stranded.`
+    );
+  }
+
   async listRules(astrologerId: string) {
     return this.prisma.availabilityRule.findMany({
       where: { astrologerId },
@@ -98,6 +149,21 @@ export class AvailabilityService {
       }
     }
 
+    /*
+     * 5.3 — refuse a shrink that would strand a paid booking.
+     *
+     * Checked BEFORE the delete, like the validation above: a change that is
+     * going to be refused must not clear the grid on its way to failing.
+     */
+    const existingBlocks = await this.prisma.availabilityBlock.findMany({
+      where: { astrologerId },
+      select: { startsAt: true, endsAt: true },
+    });
+    const orphans = await this.orphanedBy(astrologerId, rules, existingBlocks);
+    if (orphans.confirmed.length > 0) {
+      throw new ConflictException(AvailabilityService.orphanRefusal(orphans.confirmed));
+    }
+
     const before = await this.prisma.availabilityRule.count({ where: { astrologerId } });
 
     await this.prisma.$transaction(async (tx) => {
@@ -139,6 +205,24 @@ export class AvailabilityService {
     }
     if (input.startsAt.getTime() >= input.endsAt.getTime()) {
       throw new BadRequestException('A block must end after it starts.');
+    }
+
+    /*
+     * 5.3 again. A block over a booked slot orphans it just as surely as
+     * deleting the window would — and blocking out a day you have already sold
+     * is the more likely mistake, because it feels like a small change.
+     */
+    const [rules, blocks] = await Promise.all([
+      this.prisma.availabilityRule.findMany({ where: { astrologerId } }),
+      this.prisma.availabilityBlock.findMany({ where: { astrologerId }, select: { startsAt: true, endsAt: true } }),
+    ]);
+    const orphans = await this.orphanedBy(
+      astrologerId,
+      rules.map((r): WeeklyRule => ({ weekday: r.weekday, startMinute: r.startMinute, endMinute: r.endMinute })),
+      [...blocks, { startsAt: input.startsAt, endsAt: input.endsAt }],
+    );
+    if (orphans.confirmed.length > 0) {
+      throw new ConflictException(AvailabilityService.orphanRefusal(orphans.confirmed));
     }
 
     const id = ulid();

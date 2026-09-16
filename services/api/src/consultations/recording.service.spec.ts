@@ -43,6 +43,11 @@ function harness(opts: {
     recording: {
       findUnique: vi.fn(async () => (opts.recording === undefined ? null : opts.recording)),
       update: vi.fn(async () => ({})),
+      // Present on the double because deleteForCustomer iterates recordings.
+      // It was missing until the chat work reassigned it in a test, which
+      // typecheck caught and the test run did not — vitest is happy with an
+      // undefined property that a test overwrites before use.
+      findMany: vi.fn(async () => [] as Record<string, unknown>[]),
     },
     consultationAssessment: {
       findUnique: vi.fn(async () => opts.assessment ?? null),

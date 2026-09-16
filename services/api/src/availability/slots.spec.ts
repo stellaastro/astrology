@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  IST_OFFSET_MINUTES, toIst, fromIst, overlaps, rulesCollide, generateSlots,
+  IST_OFFSET_MINUTES, toIst, fromIst, overlaps, rulesCollide, generateSlots, isCovered,
 } from './slots';
 
 const iso = (d: Date) => d.toISOString();
@@ -163,5 +163,51 @@ describe('generateSlots', () => {
     });
     const times = slots.map((s) => s.startsAt.getTime());
     expect([...times].sort((a, b) => a - b)).toEqual(times);
+  });
+});
+
+describe('isCovered — the 5.3 guard', () => {
+  // Monday 2026-09-14, 09:00-13:00 IST.
+  const monday = { weekday: 1, startMinute: 9 * 60, endMinute: 13 * 60 };
+  // 10:00 IST = 04:30 UTC.
+  const start = new Date('2026-09-14T04:30:00Z');
+  const end = new Date('2026-09-14T05:00:00Z');
+
+  it('covers a booking that sits inside a window', () => {
+    expect(isCovered(start, end, [monday], [])).toBe(true);
+  });
+
+  it('does NOT cover a booking once its weekday is removed', () => {
+    // The astrologer drops Mondays. A customer has paid for Monday 10:00.
+    expect(isCovered(start, end, [{ ...monday, weekday: 2 }], [])).toBe(false);
+  });
+
+  it('does NOT cover a booking once the window is shortened past it', () => {
+    // 09:00-10:00 no longer reaches a 10:00-10:30 booking.
+    expect(isCovered(start, end, [{ weekday: 1, startMinute: 540, endMinute: 600 }], [])).toBe(false);
+  });
+
+  it('covers a booking that ends exactly at the window close', () => {
+    // 10:00-10:30 inside 09:00-10:30. Half-open: touching the edge is fine, and
+    // an off-by-one here would strand a booking for no reason.
+    expect(isCovered(start, end, [{ weekday: 1, startMinute: 540, endMinute: 630 }], [])).toBe(true);
+  });
+
+  it('does NOT cover a booking a new block sits over', () => {
+    expect(isCovered(start, end, [monday], [
+      { startsAt: new Date('2026-09-14T04:00:00Z'), endsAt: new Date('2026-09-14T06:00:00Z') },
+    ])).toBe(false);
+  });
+
+  it('is unaffected by a block that merely touches the booking', () => {
+    // A block starting exactly when the booking ends does not overlap it.
+    expect(isCovered(start, end, [monday], [
+      { startsAt: end, endsAt: new Date('2026-09-14T07:00:00Z') },
+    ])).toBe(true);
+  });
+
+  it('rejects a zero-length or inverted booking rather than calling it covered', () => {
+    expect(isCovered(start, start, [monday], [])).toBe(false);
+    expect(isCovered(end, start, [monday], [])).toBe(false);
   });
 });

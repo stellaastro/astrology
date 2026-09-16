@@ -149,3 +149,38 @@ export function generateSlots(opts: GenerateOptions): Slot[] {
   slots.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   return slots;
 }
+
+/**
+ * Would this already-booked slot still be offered under these rules?
+ *
+ * Used to stop an availability change from ORPHANING a paid booking (task
+ * 5.3): a customer who has paid for Tuesday 10:00 must not discover that the
+ * astrologer removed Tuesdays and nobody told either of them.
+ *
+ * The test is the same one `generateSlots` applies when creating a slot, so a
+ * booking is "covered" exactly when the current rules would still produce it —
+ * not by some looser second definition that could drift from the first.
+ */
+export function isCovered(
+  slotStart: Date,
+  slotEnd: Date,
+  rules: WeeklyRule[],
+  blocks: Block[],
+): boolean {
+  const durationMinutes = Math.round((slotEnd.getTime() - slotStart.getTime()) / 60_000);
+  if (durationMinutes <= 0) return false;
+
+  const ist = toIst(slotStart);
+
+  const insideAWindow = rules.some(
+    (r) =>
+      r.weekday === ist.weekday &&
+      ist.minute >= r.startMinute &&
+      ist.minute + durationMinutes <= r.endMinute,
+  );
+  if (!insideAWindow) return false;
+
+  // A block covering any part of the booking orphans it just as surely as
+  // deleting the window would.
+  return !blocks.some((b) => overlaps(slotStart, slotEnd, b.startsAt, b.endsAt));
+}

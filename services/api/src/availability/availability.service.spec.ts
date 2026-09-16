@@ -11,7 +11,10 @@ function arg<T>(fn: unknown, call: number, index: number): T {
 
 const ASTROLOGER = { id: 'A1', sessionMinutes: 30, bufferMinutes: 0 };
 
-function harness(astrologer: Record<string, unknown> | null = ASTROLOGER) {
+function harness(
+  astrologer: Record<string, unknown> | null = ASTROLOGER,
+  opts: { bookings?: Record<string, unknown>[] } = {},
+) {
   const tx = {
     availabilityRule: { deleteMany: vi.fn(async () => ({ count: 0 })), create: vi.fn(async () => ({})) },
     availabilityBlock: { create: vi.fn(async () => ({})), delete: vi.fn(async () => ({})) },
@@ -20,6 +23,7 @@ function harness(astrologer: Record<string, unknown> | null = ASTROLOGER) {
     astrologer: { findUnique: vi.fn(async () => astrologer) },
     availabilityRule: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     availabilityBlock: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null) },
+    booking: { findMany: vi.fn(async () => opts.bookings ?? []) },
     $transaction: vi.fn(async (cb: never) => (cb as (t: unknown) => Promise<unknown>)(tx)),
   };
   const audit = { record: vi.fn(async () => 'AE1') };
@@ -158,5 +162,102 @@ describe('slot lookup', () => {
     await h.svc.slotsFor('A1', from, to);
     const q = arg<{ where: Record<string, unknown> }>(h.prisma.availabilityBlock.findMany, 0, 0);
     expect(q.where).toMatchObject({ astrologerId: 'A1' });
+  });
+});
+
+describe('5.3 — availability must not orphan a paid booking', () => {
+  /** A Monday 10:00-10:30 IST booking, well in the future. */
+  function futureMonday() {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() + 14);
+    while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
+    // 10:00 IST = 04:30 UTC on that date.
+    const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 4, 30));
+    return { slotStart: start, slotEnd: new Date(start.getTime() + 30 * 60_000) };
+  }
+
+  const booked = (status: string) => ({ id: 'B1', status, ...futureMonday() });
+  const mondayMorning = win(1, 9 * 60, 13 * 60);
+
+  it('REFUSES a rule change that would strand a confirmed booking', async () => {
+    const h = harness(ASTROLOGER, { bookings: [booked('confirmed')] });
+    // The astrologer drops Mondays. Someone has paid for Monday 10:00.
+    await expect(h.svc.replaceRules('A1', [win(2, 9 * 60, 13 * 60)], {})).rejects.toThrow(ConflictException);
+    // And refuses BEFORE clearing the grid.
+    expect(h.tx.availabilityRule.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('names the stranded bookings so the operator knows what to move', async () => {
+    const h = harness(ASTROLOGER, { bookings: [booked('confirmed')] });
+    await expect(h.svc.replaceRules('A1', [], {})).rejects.toThrow(/paid booking/i);
+  });
+
+  it('ALLOWS a change that still covers the booking', async () => {
+    const h = harness(ASTROLOGER, { bookings: [booked('confirmed')] });
+    await expect(h.svc.replaceRules('A1', [mondayMorning], {})).resolves.toBeDefined();
+  });
+
+  it('allows a change that only strands an UNPAID hold', async () => {
+    const h = harness(ASTROLOGER, { bookings: [booked('held')] });
+    // A hold is someone mid-checkout and lapses on its own. Blocking an
+    // astrologer from changing their hours over one would be worse.
+    await expect(h.svc.replaceRules('A1', [win(2, 9 * 60, 13 * 60)], {})).resolves.toBeDefined();
+  });
+
+  it('REFUSES a block placed over a paid booking', async () => {
+    const h = harness(ASTROLOGER, { bookings: [booked('confirmed')] });
+    h.prisma.availabilityRule.findMany = vi.fn(async () => [
+      { weekday: 1, startMinute: 9 * 60, endMinute: 13 * 60 },
+    ]) as never;
+    const { slotStart } = futureMonday();
+    await expect(
+      h.svc.addBlock('A1', {
+        startsAt: new Date(slotStart.getTime() - 3_600_000),
+        endsAt: new Date(slotStart.getTime() + 3_600_000),
+      }, {}),
+    ).rejects.toThrow(ConflictException);
+    expect(h.tx.availabilityBlock.create).not.toHaveBeenCalled();
+  });
+
+  it('allows a block on a day with no bookings', async () => {
+    const h = harness(ASTROLOGER, { bookings: [booked('confirmed')] });
+    h.prisma.availabilityRule.findMany = vi.fn(async () => [
+      { weekday: 1, startMinute: 9 * 60, endMinute: 13 * 60 },
+    ]) as never;
+    const { slotStart } = futureMonday();
+    // A week later — nothing booked there.
+    await expect(
+      h.svc.addBlock('A1', {
+        startsAt: new Date(slotStart.getTime() + 7 * 86_400_000),
+        endsAt: new Date(slotStart.getTime() + 7 * 86_400_000 + 3_600_000),
+      }, {}),
+    ).resolves.toBeDefined();
+  });
+
+  it('asks only for future bookings that still occupy their slot', async () => {
+    const h = harness(ASTROLOGER, { bookings: [] });
+    await h.svc.replaceRules('A1', [], {});
+    const q = arg<{ where: { status: { in: string[] }; slotStart: { gte: Date } } }>(
+      h.prisma.booking.findMany, 0, 0);
+
+    // Cancelled and expired bookings released their slot and cannot be
+    // orphaned by anything.
+    expect(q.where.status.in).toEqual(['held', 'confirmed']);
+
+    /*
+     * And the PAST is excluded in the QUERY, which is the only place it can be
+     * tested here: a consultation that already happened cannot be orphaned by
+     * tomorrow's schedule, and refusing on those grounds would freeze the
+     * calendar for ever.
+     *
+     * An earlier version of this file asserted the behaviour by handing the
+     * service a past booking and expecting it to be ignored — but the test
+     * double returns whatever it is given regardless of the where clause, so
+     * that test was checking the double, not the code. The database applies
+     * this filter; the assertion that it was ASKED for is the honest one.
+     */
+    expect(q.where.slotStart.gte).toBeInstanceOf(Date);
+    expect(q.where.slotStart.gte.getTime()).toBeLessThanOrEqual(Date.now());
   });
 });

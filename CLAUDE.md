@@ -97,8 +97,8 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 5 — availability. NOT complete: 5.1 is API-only, 5.3 is open.**
-Phase 6 has its schema and nothing else. Build order:
+**Phase 5 — availability. COMPLETE. Phase 6 has its schema and nothing else:
+there is no bookings service, so nothing can create a booking.** Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -127,10 +127,10 @@ landing page reads them from the database. `/astrologer` is the practitioner's
 own surface; an admin links a profile to a signed-in account, which grants the
 `astrologer` role.
 
-**4.2's three named deliverables are NOT built and that is deliberate** — the
-availability editor is Phase 5, upcoming bookings Phase 6, the join link Phase
-8. None of those models exists yet, and the page says so rather than showing
-controls that do nothing.
+**4.2 is now COMPLETE** (ADR-053): the availability editor is built and live at
+`/astrologer`. Its other two deliverables remain deliberately unbuilt — upcoming
+bookings is Phase 6 and the join link Phase 8, and the page says so rather than
+showing controls that do nothing.
 
 **Still open in Phase 4:**
 
@@ -147,13 +147,14 @@ widens the stride, never the session — billing is per slot, so a buffer that
 lengthened the session would overcharge. Overlapping windows are refused in the
 service because MySQL has no exclusion constraints.
 
-### Phase 5 status — audited 2026-09-16, NOT complete
+### Phase 5 status — COMPLETE (2026-09-16)
 
-| | State |
-|---|---|
-| **5.1** weekly grid + blocks | **API done, NO UI.** `/astrologer` still says availability is "being built", so a practitioner cannot set their own hours — only an admin can, by calling the endpoint. This is also 4.2's deferred "availability editor" |
-| **5.2** inter-slot buffers | **Done** |
-| **5.3** shrink must not orphan paid bookings | **NOT done, and NO LONGER BLOCKED.** It was deferred because no booking model existed; one does now. `availability.service` mentions bookings only in comments — `replaceRules` and `addBlock` will happily delete the hours a paid booking sits in |
+5.1, 5.2 and 5.3 are done, and 4.2's deferred availability editor with them
+(ADR-053). An astrologer sets their own hours at `/astrologer`; `replaceRules`
+and `addBlock` refuse any change that would leave a **paid** booking outside
+those hours, naming the slots in the way. Held bookings are allowed through — an
+unpaid hold lapses on its own, and blocking an astrologer over one would be
+worse.
 
 ### Phase 6 status — schema only
 

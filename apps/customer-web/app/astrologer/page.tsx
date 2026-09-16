@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import SignOut from '../admin/SignOut';
+import AvailabilityEditor, { type Block, type Rule } from './AvailabilityEditor';
 import s from '../admin/admin.module.css';
 
 /**
@@ -85,6 +86,33 @@ export default async function AstrologerPage() {
   if (!res.ok) throw new Error(`Could not load your profile (${res.status})`);
   const me = (await res.json()) as SelfProfile;
 
+  /*
+   * Availability is fetched separately and tolerantly: a failure here should
+   * cost the astrologer the editor, not the whole page. Their profile is still
+   * worth showing.
+   */
+  let rules: Rule[] = [];
+  let blocks: Block[] = [];
+  let availabilityFailed = false;
+  try {
+    const av = await fetch(`${base}/${prefix}/astrologer/availability`, {
+      headers: {
+        cookie: jar.toString(),
+        ...(forwarded ? { 'x-forwarded-for': forwarded } : {}),
+      },
+      cache: 'no-store',
+    });
+    if (av.ok) {
+      const body = (await av.json()) as { rules?: Rule[]; blocks?: Block[] };
+      rules = body.rules ?? [];
+      blocks = body.blocks ?? [];
+    } else {
+      availabilityFailed = true;
+    }
+  } catch {
+    availabilityFailed = true;
+  }
+
   const status = me.retired ? 'retired' : me.published ? 'live' : 'draft';
 
   return (
@@ -147,11 +175,20 @@ export default async function AstrologerPage() {
             </div>
           </dl>
 
+          {availabilityFailed ? (
+            <p className="pageNote" role="alert">
+              We could not load your availability just now. Please refresh — your
+              existing hours have not been changed.
+            </p>
+          ) : (
+            <AvailabilityEditor initialRules={rules} initialBlocks={blocks} />
+          )}
+
           <p className="pageNote">
-            Setting your own availability, seeing upcoming bookings and joining
-            a consultation are being built. They are not here yet, and this page
-            would rather say so than show you controls that do nothing. Until
-            then, an administrator changes anything above on your behalf.
+            Seeing upcoming bookings and joining a consultation are still being
+            built. They are not here yet, and this page would rather say so than
+            show you controls that do nothing. The details above — your rate,
+            experience and specialisations — are changed by an administrator.
           </p>
         </div>
       </div>

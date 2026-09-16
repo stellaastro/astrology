@@ -2061,3 +2061,60 @@ authorise-then-capture and does not implement either — payments are Phase 7.
 chat, **but only alongside the maximum duration and the maximum total charge**,
 because a per-minute price with no visible ceiling is the shape customers most
 reliably misread.
+
+
+---
+
+## ADR-053 — Availability may not strand a paid booking (5.3), and astrologers edit their own hours (4.2)
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Closes:** tasks 4.2 and 5.3
+
+### 5.3 — the guard
+
+`replaceRules` and `addBlock` now refuse a change that would leave a **paid**
+booking outside the astrologer's available hours. A customer who paid for
+Tuesday 10:00 must not discover that Tuesdays were removed and nobody told
+either of them.
+
+**Confirmed is the line; held is not.** A confirmed booking has been paid for.
+A held booking is someone mid-checkout, and an unpaid hold lapses on its own —
+blocking an astrologer from changing their own hours over one would be worse
+than the hold being stranded. Held bookings are therefore allowed through.
+
+**Past bookings are ignored.** A consultation that already happened cannot be
+orphaned by tomorrow's schedule, and refusing on those grounds would freeze the
+calendar permanently.
+
+**The refusal names the bookings.** An operator who cannot see *which* slots are
+in the way cannot act on the refusal, and will eventually route around it.
+
+**Coverage reuses `generateSlots`' own test.** `isCovered` applies the same
+window-and-block logic that creates a slot, so a booking is covered exactly when
+the current rules would still produce it — not by a looser second definition
+that could drift from the first.
+
+**This was deferred as "waits for Phase 6" and that had quietly stopped being
+true.** The `Booking` model landed with 6.1–6.4; the guard was buildable from
+that moment, and `availability.service` mentioned bookings only in comments.
+Verified end to end against the API: dropping the booked weekday returns 409
+naming the slot, keeping it returns 200, and a block placed over the slot
+returns 409.
+
+### 4.2 — the editor
+
+`/astrologer` now carries a weekly-hours editor. Until now the endpoints existed
+but no screen did, so a practitioner could not set their own hours — only an
+admin could, by calling the API. The page had been saying availability was
+"being built" since Phase 4.
+
+**No timezone conversion happens in the editor.** Minutes-from-midnight in,
+minutes-from-midnight out, labelled India Standard Time. A conversion here would
+be a second place for the offset to be applied, and applying it twice is how a
+schedule slips by five and a half hours.
+
+**The 409s are surfaced verbatim.** Both the overlap refusal and the 5.3 refusal
+carry a message that names the problem; showing "conflict" instead would throw
+away the only useful part.
+
+Availability loads in its own `try`, so a failure costs the editor rather than
+the whole page — the profile above it is still worth showing.
