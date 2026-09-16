@@ -4,6 +4,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService, type AuditActor } from '../audit/audit.service';
 import { generateSlots, isCovered, rulesCollide, type Block, type Slot, type WeeklyRule } from './slots';
 
+/**
+ * The statuses that occupy a slot — the complement of the two the generated
+ * `slot_key` column maps to NULL.
+ *
+ * Declared here rather than imported from BookingsService because availability
+ * must not depend on bookings: the dependency runs the other way, and a cycle
+ * would be the first sign that the slot arithmetic had started to know about
+ * money. Both lists mirror one CASE expression in
+ * `20260915151218_add_bookings/migration.sql`, and all three must move
+ * together.
+ */
+const NON_OCCUPYING_STATUSES = ['cancelled', 'expired'] as const;
+
 const ulid = monotonicFactory();
 
 /** How far ahead anyone may ask for slots. */
@@ -273,6 +286,19 @@ export class AvailabilityService {
   /**
    * Bookable slots for an astrologer in a window.
    *
+   * ALREADY-BOOKED SLOTS ARE REMOVED. `generateSlots` knows only about rules
+   * and blocks — it describes when the astrologer WORKS, not when they are
+   * FREE — so without this the public list offers times that are already sold
+   * and every customer who picks one is told to choose again. That is not a
+   * safety problem (the unique index on the generated column is what actually
+   * prevents the double booking) but it is the difference between a calendar
+   * and a lottery.
+   *
+   * The statuses excluded are exactly the ones that occupy the slot, which is
+   * the same list the booking service and the generated column use: a
+   * cancelled or expired booking must return its slot to sale, which is the
+   * whole point of ADR-029.
+   *
    * Refuses an unbookable astrologer rather than returning an empty list: "no
    * slots" and "this person has no price set" are different answers, and
    * collapsing them is how a caller concludes someone is merely busy.
@@ -288,14 +314,24 @@ export class AvailabilityService {
       throw new BadRequestException(`Ask for at most ${MAX_HORIZON_DAYS} days at a time.`);
     }
 
-    const [rules, blocks] = await Promise.all([
+    const [rules, blocks, booked] = await Promise.all([
       this.prisma.availabilityRule.findMany({ where: { astrologerId } }),
       this.prisma.availabilityBlock.findMany({
         where: { astrologerId, endsAt: { gte: from }, startsAt: { lte: to } },
       }),
+      this.prisma.booking.findMany({
+        where: {
+          astrologerId,
+          status: { notIn: [...NON_OCCUPYING_STATUSES] },
+          slotStart: { gte: from, lte: to },
+        },
+        select: { slotStart: true },
+      }),
     ]);
 
-    return generateSlots({
+    const occupied = new Set(booked.map((b) => b.slotStart.getTime()));
+
+    const slots = generateSlots({
       rules: rules.map((r): WeeklyRule => ({
         weekday: r.weekday,
         startMinute: r.startMinute,
@@ -308,5 +344,7 @@ export class AvailabilityService {
       to,
       now: new Date(),
     });
+
+    return slots.filter((s) => !occupied.has(s.startsAt.getTime()));
   }
 }

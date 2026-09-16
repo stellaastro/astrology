@@ -2118,3 +2118,152 @@ away the only useful part.
 
 Availability loads in its own `try`, so a failure costs the editor rather than
 the whole page — the profile above it is still worth showing.
+
+---
+
+## ADR-054 — The booking lifecycle: holds, idempotency, reschedule and the reaper
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Closes:** tasks 6.2, 6.3, 6.6, 6.10
+
+Phase 6 had its schema and nothing else. The `Booking` model, the generated
+slot-occupancy column and the tax columns all landed on 2026-09-15, and until
+today **nothing in the product could create a booking** — the only rows in the
+table were ones I had inserted by hand to test the 5.3 guard.
+
+### The state machine, and where it is enforced
+
+```
+held ──confirm──▶ confirmed ──▶ completed | no_show
+ │  └──reaper───▶ expired
+ └──cancel──▶ cancelled       confirmed ──cancel──▶ cancelled
+```
+
+`BookingsService` is the only place a booking changes state. Two invariants
+carry the module, and neither is enforced by being careful:
+
+1. **One occupying booking per slot** is enforced by the unique index on the
+   generated `slot_key` column (ADR-029), *not* by the availability check that
+   precedes it. Everything that reads "check, then insert" in that file is a
+   courtesy that produces a civil error message; the `catch` around the insert
+   is the guard. Verified by mutation: removing the P2002 handler fails two
+   tests.
+2. **The price is frozen at creation** (§79). Nothing recomputes it — not on
+   reschedule, not on confirm. Reading it back through
+   `astrologers.session_rate_paise` would rewrite the price of every past
+   booking the moment somebody edited a rate.
+
+### 6.2 — the hold is the database row
+
+Fifteen minutes, because the hold has to outlive the **entire** Razorpay flow
+and a UPI collect request pends for minutes while the customer opens a banking
+app. The instinct is a short TTL, as if this were a cache. It is not: a hold
+that lapses while the customer is authorising takes money for a slot somebody
+else now owns.
+
+### 6.3 — the idempotency key is required, not optional
+
+A double-click creating two Razorpay orders for one slot is the most likely
+incident at launch. An optional guard is one the client omits on the day it
+matters, so `POST /bookings` returns 400 without an `Idempotency-Key` header.
+The slot index protects the **slot**; this protects the **customer's card**.
+
+### 6.6 — reschedule is ONE UPDATE, not create-then-cancel
+
+The plan says to acquire the new slot before releasing the old and never the
+reverse. A single `UPDATE` of `slot_start` is the strongest form of that: MySQL
+recomputes the generated `slot_key` inside the same statement, so either the new
+slot was free and the move happened, or the unique index rejected the whole
+statement and the booking still holds its **original** slot. There is no instant
+at which the customer holds neither, and none at which they hold both.
+
+Moving the row also keeps the price snapshot, the payment linkage and the
+booking id attached to the thing the customer thinks of as their booking. A new
+row would need the price copied across, and a copied price snapshot is a
+recomputed price waiting to happen.
+
+Limits are policy, not physics, and O4 may move them: **3 moves**, and none
+inside **120 minutes** of the start — because moving a booking ten minutes
+before it begins strands an astrologer already sitting at a microphone.
+
+### 6.10 — the reaper
+
+Every minute, row by row rather than one `updateMany`: each expiry returns a
+slot to sale and belongs in the audit log as its own event. The `WHERE` clause
+re-checks `status = 'held'` and the audit row is written in the same
+transaction, so **a payment that confirms the booking mid-sweep wins** — the
+update matches nothing and nothing is recorded. An audit row saying a paid
+booking expired would be a permanent, unerasable lie.
+
+Running it rarely would make the effective hold longer than the advertised one.
+"Your slot is held for 15 minutes" has to be true in the direction that costs
+the business, not only the one that costs the customer.
+
+### Two decisions that look small
+
+**`modality` is a column, not a derivation.** It could have been read off
+`chat_rate_per_minute_paise IS NULL`. That trick works until someone stores a
+rate on a voice booking for reference, and then every reader of the table is
+quietly wrong. It is chosen at *booking* because it decides which price snapshot
+is taken: voice freezes an amount, chat freezes an authorised ceiling (ADR-052).
+
+**A chat authorisation is clamped to the slot.** A 30-minute slot with
+`chatMaxMinutes` of 45 would otherwise authorise a chat running a quarter of an
+hour into the next customer's time. The astrologer profile is the real defect
+there, and the clamp is logged as a warning naming the astrologer so the
+misconfiguration is visible rather than absorbed.
+
+### There is deliberately NO customer-facing confirm route
+
+A booking becomes confirmed when Razorpay says the money arrived. The server is
+authoritative for payment success (§78), and a client that can declare payment
+is a client that can book for free. `confirm()` exists as a service method with
+Phase 7's webhook as its only intended caller, and it **refuses without the tax
+split**, per the schema's own invariant: an unpaid held row may carry nulls, a
+paid one may not.
+
+It deliberately does **not** consult the hold clock. A payment that lands a
+second after the hold lapsed still wins, because refusing after taking the money
+is worse than honouring a slightly stale hold. If the reaper has already flipped
+the row, the status check fails loudly instead — the slot may have been resold,
+and Phase 7 must refund rather than double-book.
+
+### Two defects the live endpoint found that the unit tests did not
+
+Both were caught by exercising the real API against the real database, and
+neither would have been caught by any test I had written.
+
+1. **A double-click was told its own booking had just been taken.** The
+   occupancy check ran before the idempotency layer, so the retry was refused by
+   the row the first request had created. A client surfacing that honestly would
+   send the customer to pick a different slot, and they would end up with two
+   bookings — the exact incident 6.3 exists to prevent. Fixed with a replay
+   lookup that runs first, **scoped to the caller**: `idempotency_key` is
+   globally unique on the table, so an unscoped lookup would have handed
+   somebody else's booking to anyone who guessed a key.
+
+2. **The public slot list offered slots that were already sold.** `generateSlots`
+   knows only about rules and blocks — it describes when an astrologer *works*,
+   not when they are *free* — so every customer picking a booked time was told
+   to choose again. Not a safety problem (the unique index is what prevents the
+   double booking) but the difference between a calendar and a lottery.
+   `slotsFor` now filters occupied slots out.
+
+The second fix made the first's occupancy query unreachable, which would have
+left dead code with a passing test beside it. Occupancy is therefore checked
+**before** availability, so a sold slot can still say "that time has just been
+taken" — true, actionable, and different from "that is not a time this
+astrologer works".
+
+### Verified
+
+Seventeen mutations, each removing one guard, each failing at least one test.
+Then end to end against the running API and a real MySQL: hold, replay the same
+key (same id, no second row), the slot leaving and re-entering the public list,
+a second customer refused, reschedule, a stranger's reschedule returning 404
+rather than 403, cancel, and **rebooking the cancelled slot** — the test that
+catches the MySQL partial-index mistake. Finally the reaper, on its own cron: a
+backdated hold flipped to `expired`, `slot_key` became NULL, the slot returned
+to the public list and was rebooked.
+
+The audit rows carry ids, times and amounts and no personal data (ADR-040),
+checked against the test accounts' addresses.

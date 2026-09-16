@@ -523,6 +523,16 @@ model Booking {
   slotStart DateTime @map("slot_start")
   slotEnd   DateTime @map("slot_end")
 
+  /// voice · chat. Chosen at BOOKING, because it decides which price snapshot
+  /// is taken — voice freezes an amount, chat freezes an authorised ceiling and
+  /// a per-minute rate (ADR-052). Consultation.modality says the same thing
+  /// about the session that actually happened; this says what was sold.
+  ///
+  /// Deliberately NOT derived from `chatRatePerMinutePaise == null`: that trick
+  /// works until someone stores a rate on a voice booking for reference, and
+  /// then every reader of the table is quietly wrong.
+  modality String @default("voice") @db.VarChar(8)
+
   /// held · confirmed · cancelled · expired · completed · no_show
   status String @db.VarChar(16)
 
@@ -584,6 +594,18 @@ model Booking {
 
   confirmedAt DateTime? @map("confirmed_at")
   cancelledAt DateTime? @map("cancelled_at")
+
+  /// customer · astrologer · admin · system. The refund policy turns on this:
+  /// a customer cancelling ninety minutes ahead and an astrologer cancelling
+  /// ninety seconds ahead must never be the same refund.
+  cancelledBy  String? @map("cancelled_by") @db.VarChar(16)
+  cancelReason String? @map("cancel_reason") @db.VarChar(200)
+
+  /// How many times this booking has been moved (task 6.6). A reschedule moves
+  /// THIS row rather than creating a second one, so without a counter the
+  /// history lives only in the audit log — which is the wrong place to enforce
+  /// a limit from, on the request path.
+  rescheduleCount Int @default(0) @map("reschedule_count")
 
   /// One key, one booking (task 6.3). A double-click creating two Razorpay
   /// orders for one slot is the most likely launch incident: the unique index

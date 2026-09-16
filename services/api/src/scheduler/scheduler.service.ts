@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { OutboxService } from '../outbox/outbox.service';
 import { IdempotencyService } from '../idempotency/idempotency.service';
 import { RetentionService } from '../privacy/retention.service';
+import { BookingsService } from '../bookings/bookings.service';
 
 /**
  * Recurring work.
@@ -11,12 +12,12 @@ import { RetentionService } from '../privacy/retention.service';
  * billing. That inverted (ADR-030). Pay-at-booking needs timers MORE, and the
  * jobs below are only the ones due now — these arrive as later phases land:
  *
- *   Phase 6  abandoned-checkout reaper — a customer opens Razorpay, closes the
- *            tab, and the slot stays held forever without this
  *   Phase 6  T-24h and T-1h booking reminders (the compensating control for
- *            dropping WhatsApp)
+ *            dropping WhatsApp) — waits on TRAI DLT registration
  *   Phase 6  no-show detection window
  *   Phase 7  refund-window expiry
+ *
+ * The abandoned-checkout reaper landed with task 6.10 and is below.
  *
  * SINGLE INSTANCE ONLY. @nestjs/schedule runs in-process, so two API replicas
  * would run every job twice — double emails, double reaping. That is fine
@@ -33,7 +34,32 @@ export class SchedulerService {
     private readonly outbox: OutboxService,
     private readonly idempotency: IdempotencyService,
     private readonly retention: RetentionService,
+    private readonly bookings: BookingsService,
   ) {}
+
+  /**
+   * The abandoned-checkout reaper (task 6.10).
+   *
+   * A customer opens Razorpay, closes the tab, and the slot stays held for
+   * ever without this. At roster 3 that is a visible part of the sellable week.
+   *
+   * EVERY MINUTE, which is roughly HOLD_MINUTES/15 of extra delay on average —
+   * a slot is returned to sale within a minute of its hold lapsing. Running it
+   * rarely would make the effective hold longer than the advertised one, and
+   * "your slot is held for 15 minutes" has to be true in the direction that
+   * costs the business, not only in the direction that costs the customer.
+   *
+   * The sweep is idempotent and its WHERE clause re-checks the status, so a
+   * tick that overlaps a payment confirmation loses to the payment.
+   */
+  @Cron(CronExpression.EVERY_MINUTE, { name: 'bookings.expire-holds' })
+  async expireAbandonedHolds(): Promise<void> {
+    try {
+      await this.bookings.expireHolds();
+    } catch (err) {
+      this.log.error('Hold expiry failed', err instanceof Error ? err.stack : String(err));
+    }
+  }
 
   /**
    * Outbox delivery. Every 10s: fast enough that a booking confirmation feels

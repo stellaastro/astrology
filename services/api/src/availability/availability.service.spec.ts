@@ -23,6 +23,8 @@ function harness(
     astrologer: { findUnique: vi.fn(async () => astrologer) },
     availabilityRule: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     availabilityBlock: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null) },
+    // slotsFor asks for OCCUPIED slots; orphanedBy asks for upcoming bookings.
+    // Both land here, so a test steers whichever it needs.
     booking: { findMany: vi.fn(async () => opts.bookings ?? []) },
     $transaction: vi.fn(async (cb: never) => (cb as (t: unknown) => Promise<unknown>)(tx)),
   };
@@ -259,5 +261,50 @@ describe('5.3 — availability must not orphan a paid booking', () => {
      */
     expect(q.where.slotStart.gte).toBeInstanceOf(Date);
     expect(q.where.slotStart.gte.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+/**
+ * FOUND BY EXERCISING THE REAL ENDPOINT during Phase 6.
+ *
+ * generateSlots knows only about rules and blocks — it describes when the
+ * astrologer WORKS, not when they are FREE. The public list was therefore
+ * offering times that were already sold, and every customer who picked one was
+ * told to choose again. Not a safety problem (the unique index on the generated
+ * column is what prevents the double booking) but it is the difference between
+ * a calendar and a lottery.
+ */
+describe('slots already sold are not offered', () => {
+  const { from, to } = nextMonday();
+  const rules = [win(1, 540, 660)]; // Monday 09:00-11:00 IST -> 4 half-hour slots
+
+  function slotHarness(bookings: Record<string, unknown>[] = []) {
+    const h = harness(ASTROLOGER, { bookings });
+    h.prisma.availabilityRule.findMany = vi.fn(async () => rules) as never;
+    return h;
+  }
+
+  it('offers every slot when nothing is booked', async () => {
+    const h = slotHarness();
+    expect(await h.svc.slotsFor('A1', from, to)).toHaveLength(4);
+  });
+
+  it('removes a slot an occupying booking holds', async () => {
+    const all = await slotHarness().svc.slotsFor('A1', from, to);
+    const taken = all[1]!.startsAt;
+    const h = slotHarness([{ slotStart: taken }]);
+    const left = await h.svc.slotsFor('A1', from, to);
+    expect(left).toHaveLength(3);
+    expect(left.map((s) => s.startsAt.getTime())).not.toContain(taken.getTime());
+  });
+
+  it('asks only for OCCUPYING statuses — book, cancel, rebook must work (ADR-029)', async () => {
+    const h = slotHarness();
+    await h.svc.slotsFor('A1', from, to);
+    const calls = (h.prisma.booking.findMany as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const where = (calls[0]![0] as { where: { status: { notIn: string[] } } }).where;
+    // Mirrors the generated column's CASE. A cancelled booking must return its
+    // slot to sale, which is the entire point of the NULL-when-inactive trick.
+    expect(where.status.notIn).toEqual(['cancelled', 'expired']);
   });
 });

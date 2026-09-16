@@ -97,8 +97,9 @@ wins — check `DECISION_LOG.md` for the reasoning before proposing otherwise.
 
 ## Phase
 
-**Phase 5 — availability. COMPLETE. Phase 6 has its schema and nothing else:
-there is no bookings service, so nothing can create a booking.** Build order:
+**Phase 6 — booking. Holds, idempotency, reschedule and the reaper are done
+(ADR-054); no-show, overrun and four-eyes are not, and nothing can be CONFIRMED
+until Phase 7 pays for it.** Build order:
 
 ```
 1 Foundation → 2 Public entry (unblocks Razorpay) → 3 Identity →
@@ -156,14 +157,47 @@ those hours, naming the slots in the way. Held bookings are allowed through — 
 unpaid hold lapses on its own, and blocking an astrologer over one would be
 worse.
 
-### Phase 6 status — schema only
+### Phase 6 status — bookings work; payment, no-show and overrun do not
 
-6.1–6.5 are the schema and are done and verified (generated column, durable
-hold columns, idempotency key, price snapshot and tax columns, UTC slots).
-**There is no bookings module, no service and no endpoint** — nothing can
-create a booking. 6.6 reschedule, 6.7 overrun policy, 6.8 no-show detector and
-6.10 the reaper are all unbuilt. 6.9's four-eyes exists only for *abuse review*
-(ADR-049), not for no-show or refund adjudication. 6.11 waits on TRAI DLT.
+**Done (ADR-054):** 6.1-6.5 schema, and now **6.2 durable holds, 6.3
+idempotency, 6.6 reschedule and 6.10 the reaper**. A signed-in customer can hold
+a real slot, move it, cancel it, and rebook a cancelled one. `BookingsService`
+is the only place a booking changes state.
+
+**Two things to know before touching this:**
+
+1. **The unique index on the generated `slot_key` is the guarantee, not the
+   availability check.** Everything that reads "check, then insert" is a
+   courtesy that produces a civil message; the `catch` around the insert is the
+   guard.
+2. **There is no customer-facing confirm route, deliberately.** `confirm()` is a
+   service method whose only intended caller is Phase 7's Razorpay webhook, and
+   it **refuses without the tax split**. So **nothing can currently become
+   `confirmed`** — every booking is a `held` row that the reaper will expire.
+   That is the correct state of a system with no payments yet, not a gap to
+   route around.
+
+**Still open in Phase 6:**
+
+- **6.7** overrun policy — no room close at T+n. Needs Phase 8's rooms.
+- **6.8** no-show detector — needs 100ms join/leave events (Phase 8).
+- **6.9** four-eyes on no-show and refund adjudication. **The `cancelledBy` and
+  notice-minutes columns now exist to make it possible**, but the control does
+  not, and at roster 3 the person adjudicating an astrologer no-show is still
+  that astrologer. Blocks the first paid booking; owner action O5.
+- **6.11** T-24h/T-1h reminders — waits on TRAI DLT registration.
+- **No booking UI.** The API is complete enough to build against; no screen
+  calls it yet.
+
+**Two smaller gaps this work exposed:**
+
+- `chatRatePerMinutePaise` and `chatMaxMinutes` are on the `Astrologer` model
+  but **not in the admin DTO**, so chat rates cannot be set through any screen
+  and every chat booking is refused. Phase 4 follow-up.
+- A chat authorisation is **clamped to the slot length**, and the clamp is
+  logged as a warning. An astrologer with `chatMaxMinutes` longer than
+  `sessionMinutes` is misconfigured; the admin form should refuse it at the
+  source.
 
 **The rate column is the CURRENT rate only.** Phase 6 bookings freeze their own
 price snapshot; never read a past booking's price back through

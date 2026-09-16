@@ -13,6 +13,7 @@ import { LeadsModule } from './leads/leads.module';
 import { PrivacyModule } from './privacy/privacy.module';
 import { AstrologersModule } from './astrologers/astrologers.module';
 import { AvailabilityModule } from './availability/availability.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ConsultationsModule } from './consultations/consultations.module';
 import { MailModule } from './mail/mail.module';
@@ -54,6 +55,7 @@ import { AuthGuard } from './auth/auth.guard';
     PrivacyModule,
     AstrologersModule,
     AvailabilityModule,
+    BookingsModule,
     RealtimeModule,
     ConsultationsModule,
     // Registers the outbox handler that sends waitlist confirmations.
