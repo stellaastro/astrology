@@ -1295,6 +1295,30 @@ shipping. **ADR-018's MFA requirement is superseded, not met.**
 **Revisit before Phase 7.** Once real money moves, one factor on the account
 that approves refunds should be reconsidered.
 
+### Amendment, 2026-09-15 — a second factor now exists, without TOTP
+
+`guruji@stellaastro.com` has been granted `admin:super`. It signs in through
+Google (ADR-037), which already carries the owner's own 2FA, so **the admin
+surface is now reachable by a path that has a second factor** — obtained at no
+cost and with no TOTP app to manage.
+
+**This does not retract the decision above; it narrows it.** The password
+account is unchanged and still single-factor, and `admin@stellaastro.com` is
+deliberately kept as the **break-glass route** for the case where Google is
+unavailable or the account is locked out of it. ADR-018 is still superseded
+rather than met, because the weaker path remains open and nothing forces the
+stronger one.
+
+**So the Phase 7 revisit stands, and it is now a smaller question:** not "how do
+we add MFA" but "do we close or further restrict the password path once real
+money moves". Closing it entirely trades one risk for another — a sole
+dependency on Google for administrative access — which is why it is a decision
+for that point and not this one.
+
+The grant was made with `services/api/src/auth/cli/grant-role.ts`, which writes
+an audit row carrying the before and after role sets. A privilege change that
+leaves no trace is exactly the kind an investigation needs and cannot find.
+
 ---
 
 ## ADR-039 — Sessions are rows, not self-contained tokens
@@ -1322,3 +1346,1048 @@ answerable; the scheduler purges a week past expiry.
 
 **The guard denies by default.** A route is public only if it says `@Public()`,
 so an endpoint added without thinking is closed rather than open.
+
+---
+
+## ADR-040 — DPDP access and erasure, verified by email
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Task:** 3.6
+
+**Decision.** A waitlist lead can ask for a copy of everything held about them,
+or ask for it to be deleted. Both are verified by a **one-time link emailed to
+the address in question**, valid for 24 hours and usable once.
+
+**Why email, and not something better.** A lead has **no account**. There is no
+session to authenticate against and no password to check. The only thing a
+person can actually prove about a waitlist entry is control of the address —
+which is exactly what double opt-in already proves (ADR-028). Anything else
+would either be weaker (trusting a typed address) or invented (asking for
+identity documents to release an email address, which collects more personal
+data than it protects).
+
+### Three consequences that shaped the design
+
+**1. The request endpoint is an enumeration oracle unless it is careful.**
+"We've sent you a link" versus "we hold nothing for you" answers the question
+*is this named person on an astrology waitlist*. On this service that is
+sensitive. The reply is byte-identical either way, and an unknown address
+creates no row, sends no mail and writes no audit event — each of those would
+be an observable side-channel. Same rule as the signup endpoint.
+
+**2. Erasure must be complete, or it must not claim to be.** Three places held
+a copy of the address and only one was the lead row:
+
+| Where | What was done |
+|---|---|
+| `leads` row | Deleted. `privacy_requests` cascade with it |
+| `outbox_messages.payload` | Deleted by `leadId`. Delivered rows kept their payload **for ever**, so without this the address outlived the erasure |
+| `audit_events.after` | **Stopped writing it at all** — see below |
+
+**3. The audit log is append-only, so personal data must never enter it.** The
+signup event carried the address. That made complete erasure impossible: the
+lead row could go, and the address would remain in an immutable event for ever,
+making "we have deleted your data" false. The fix is at the source — the event
+now records the ULID, the locale and the IP, and there is a test that fails if
+anyone puts the address back. Deleting audit rows was rejected as the fix; an
+audit log with a deletion path is not an audit log.
+
+**No hash of the address is kept either.** A SHA-256 of an email is trivially
+reversible for any address someone already suspects, so keeping one to "prove
+which record was erased" would leave behind precisely the residue erasure
+exists to remove. The lead's ULID proves a specific record was erased, on a
+date, under a specific request — which is what demonstrating compliance
+requires.
+
+**Erasure is POST-only.** Mail clients, link scanners and corporate security
+proxies all prefetch links. An erasure behind a GET would delete records before
+anyone clicked anything.
+
+**Known gap:** a restore from backup re-introduces rows erased since that dump.
+Re-applying completed erasures is a step in the restore and breach runbooks.
+
+---
+
+## ADR-041 — Data retention has numbers, and one deliberate blank
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Task:** 3.7
+
+**Decision.** Horizons are enforced by a daily job, not by intention. Full
+table and reasoning in `docs/policies/DATA_RETENTION.md`; the defaults in
+`RetentionService` are the policy.
+
+- Unconfirmed leads: **30 days.** Consent was never verified and they are
+  uncontactable by design, so there is no purpose to point at.
+- Delivered outbox messages: **30 days.** Payloads carry addresses.
+- Spent or expired privacy requests: **7 days.**
+- Audit events: **never**, and they hold no personal data (ADR-040).
+- Development fixtures: **never reaped**, at any horizon.
+
+**Confirmed leads have no default expiry, deliberately.** Someone who confirmed
+asked to be told when bookings open; deleting them at an invented twelve or
+twenty-four months would silently break the waitlist's only promise, and they
+would never learn why the email never came. How long that promise lasts is a
+business and legal question. **Owner decision** — the mechanism is built,
+tested and switched off, and `RETENTION_CONFIRMED_LEAD_DAYS` enables it with no
+code change.
+
+**Daily rather than hourly.** This deletes people's records, so an error in a
+horizon should have a day to be noticed rather than an hour.
+
+---
+
+## ADR-042 — R2 bucket layout: KYC is isolated by bucket, not by prefix
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Supplements:** ADR-014 (R2 as
+the object store), ADR-032 (backups), ADR-036 (synthetic data)
+
+**Decision.** Four buckets, each with one job, all private. Full table in
+`docs/architecture/R2_BUCKETS.md`.
+
+- `stella-kyc` — real KYC documents, nothing else
+- `stella-kyc-dev` — synthetic KYC only, every file marked `SAMPLE / NOT VALID`
+- `stella-backups` — dumps, binlogs, the encrypted secrets archive
+- `stellaastro` — pre-existing, empty, unused
+
+**Buckets, not prefixes, and that is the substance of this ADR.** KYC documents
+are the most sensitive data the project will hold: government identity
+documents belonging to real people. Two prefixes inside one bucket share a
+blast radius — any credential that can read the bucket can read both. Separate
+buckets let a token be scoped so the backup job cannot read KYC and the KYC
+path cannot read backups. The isolation has to be something the storage
+provider enforces, not something the code remembers.
+
+**Synthetic KYC gets its own bucket too**, per ADR-036, which already forbade
+putting it in `stella-backups`. A fixture identity document sitting beside a
+real one is how a fixture eventually gets served as real.
+
+**Backups stay on R2.** They were put there by ADR-032, independently of and
+earlier than any KYC work, and the two uses share a provider and nothing else.
+Moving backups off R2 without naming a replacement destination would leave the
+project with no offsite backup — the single largest unmitigated risk the plan
+identified, and the one task 1.4 exists to close.
+
+**Verified, not assumed.** Every bucket refuses an unauthenticated request:
+R2 answers `InvalidArgument / Authorization` with 113 bytes of XML and no
+object data. Checked against a real backup object, not an empty path.
+
+**Known gap, recorded rather than accepted.** Both tokens in `config.txt` are
+admin-level — each can list, create and delete buckets, proven by the fact that
+either can call `ListBuckets`, which an `Object Read & Write` token cannot. So
+the nightly backup currently holds a credential that could delete its own
+bucket and, once KYC exists, read KYC documents. Replacing these with three
+bucket-scoped `Object Read & Write` tokens is an owner action in the Cloudflare
+dashboard and **should happen before the first real KYC document is stored**.
+
+---
+
+## ADR-043 — Astrologer profiles: admin-created, draft by default, paise only
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Task:** 4.1
+
+**Decision.** An `Astrologer` model holding the public profile and the
+commercial terms. Created by an administrator, never by self-signup, and
+invisible to the public until a human publishes it.
+
+**No self-signup, and no KYC pipeline.** At a roster of twelve or fewer, a KYC
+automation pipeline costs more than it protects (ADR-033, against Edition 2.0).
+A person with admin rights types the profile in; the practitioner's account is
+linked when they first sign in. `userId` is therefore nullable, and that is the
+normal state of a fresh profile — the profile is the record, the account is
+only how they reach it.
+
+**Every profile is created as a draft.** Publishing is a separate call with its
+own audit action, because it is the one decision on this model with
+consequences outside the admin screen. Nothing reaches the public site as a
+side effect of being typed in.
+
+**The public surface is real or empty**, enforced in three places rather than
+one, because this is the rule §13 and §71 both exist to protect:
+
+1. `listPublic()` filters on `publishedAt`, `retiredAt` **and**
+   `isDevFixture: false`. The fixture filter is not redundant with the boot
+   guard: the guard protects production, and without this filter a development
+   demo of the public page would show twenty invented practitioners and look
+   entirely correct.
+2. `setPublished` refuses to publish a fixture at all — a clear 409 in
+   development rather than a crash-loop in production.
+3. `FixtureGuard` refuses to boot when fixture rows exist under a
+   non-development profile, now covering astrologers as well as leads.
+
+Verified against the real database, not doubles: with 20 fixtures of which 18
+are published, the public endpoint returns 0 — and adding one genuine published
+row returns 1, which is the check that distinguishes correct filtering from a
+filter that excludes everything.
+
+**The rate is integer paise and arrives as a string.** `"1250.50"` through JSON
+is a float, and a float is what integer-paise Money exists to keep off the
+money path. The DTO takes a string, `Money.fromString` parses it, and sub-paise
+precision is rejected rather than rounded quietly.
+
+**The API returns BOTH `sessionRatePaise` and `sessionRateDisplay`.** An earlier
+version returned only the formatted string — which is `₹1,250.50`, a localised
+display string with a currency symbol and Indian digit grouping. Putting that
+in a payload forces every client to parse it back into a number, and parsing a
+formatted currency is exactly where a float creeps back in.
+
+**This column is the CURRENT rate and nothing else.** A booking freezes its own
+price snapshot at creation (§79, Phase 6) and must never read back through
+here; otherwise editing a rate would silently rewrite the price of every past
+booking. A rate change is audited with both the old and new value, so "what did
+this cost last month" is answerable from the trail.
+
+**Twenty synthetic astrologers, not three.** Building against the three real
+directors is how the interesting bugs get missed: availability collisions, an
+admin list with a second page, two practitioners free at the same minute, a
+rate that is not round. The negative cases are seeded deliberately — two
+unpublished, one retired — because seeding only the happy path is how the empty
+and error states ship having never been looked at. Every row carries
+`isDevFixture` and a `fixtureDataset`, so cleanup deletes only what that run
+created; "delete where is_dev_fixture" would take another dataset's rows too.
+
+---
+
+## ADR-044 — Experience and rate are nullable; the founders are rows
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Tasks:** 4.2, 4.3
+
+**Decision.** `Astrologer.experienceYears` and `Astrologer.sessionRatePaise`
+are nullable. The three founding directors are real rows, entered through a
+one-off CLI, published, and read by the landing page.
+
+**Why nullable.** The three directors are real, named, and have been on the
+public site since Phase 2 — but their years of practice and per-session price
+are owner action O3 and have not arrived. Required columns meant **the real
+people could not be entered while twenty invented ones could.** A model that
+demands data nobody has is the model being wrong, not the data.
+
+This creates a state worth naming: **publishable but not bookable.** A profile
+can be named on the site as a founding astrologer while the price remains an
+owner decision. `bookable` is derived from the rate being present, and Phase 6
+enforces the second half — no rate, no booking. A rate of **zero is still
+refused**: absent and free are different claims, and nobody decided to give
+consultations away.
+
+**The landing page reads from the database** and no longer carries a hardcoded
+array. On a failed fetch it says so rather than falling back to a copy of the
+names: two sources of truth for who works here is exactly the drift this
+removed. Cached with a five-minute revalidate, so an API blip cannot blank the
+founders band.
+
+**An ordering bug this exposed.** `listPublic` sorted by `experienceYears desc,
+nameEn asc`, which reads well until every value is null — then it collapses to
+alphabetical and silently reordered three real people on a live page, putting
+the Executive Director third. It now sorts by `createdAt asc`, which is stable
+and preserves the order the site has always shown. A deliberate reorder would
+be a `displayOrder` column, not a sort key that happens to work.
+
+**Founders were imported by CLI, not through the admin screen.** The screen is
+the right tool for every astrologer after these three; this was a one-off
+migration of content that was hardcoded in `app/page.tsx`, and the audit trail
+should say a CLI run on the host did it rather than record the owner's account
+as having typed it in. The import enters names and company office and
+**nothing else** — it is idempotent and never overwrites, so a re-run cannot
+wipe credentials added later through the screen.
+
+### Task 4.2 — the astrologer's own surface
+
+`Astrologer.userId` existed from ADR-043 and nothing ever set it, so an
+astrologer who signed in reached nothing. `POST /admin/astrologers/:id/link`
+attaches an account and grants the `astrologer` role **in one transaction**: a
+link without a role is someone who cannot reach their own page, and a role
+without a link is a page that does not know who they are. Both half-states
+waste an afternoon.
+
+The account must already exist — sign in with Google once, then be linked.
+Creating one here would mean inventing a password nobody chose or a Google
+identity that cannot be verified, the same reasoning as `grant-role`.
+
+`GET /astrologer/me` resolves the profile **from the session**, never from a
+parameter: an endpoint that takes an id and checks it afterwards is one
+refactor away from not checking.
+
+**What 4.2 deliberately does not ship.** Its three named deliverables — the
+availability editor, upcoming bookings and the join link — belong to Phases 5,
+6 and 8, and none of those models exists. Screens built against models that do
+not exist are how a demo gets mistaken for a working feature (§71). The page
+says what is coming and shows no controls that do nothing.
+
+---
+
+## ADR-045 — Availability: weekly rules in IST wall-clock, blocks in UTC
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Tasks:** 5.1, 5.2
+
+**Decision.** Two models, stored differently on purpose.
+
+- **`AvailabilityRule`** — a recurring weekly window, stored as an **IST
+  wall-clock** weekday plus minutes-from-midnight. "I work Tuesdays 09:00 to
+  13:00" is a statement about local clock time that stays true whatever happens
+  elsewhere. Stored as a UTC instant it would mean something different every
+  time another country changed its clocks (task 6.5).
+- **`AvailabilityBlock`** — a one-off absence, stored as **UTC instants**. "I am
+  at a wedding from Friday evening to Sunday night" is a real interval in the
+  world, not a claim about clock readings.
+
+Conflating the two is what makes a schedule drift.
+
+**IST is a fixed +05:30 and the arithmetic is exact**, so no date library is
+used. India has observed no daylight saving since 1945. **That is an assumption
+about India, not about time** — an astrologer in a DST-observing country would
+need a real timezone library and a zone id per rule, and `slots.ts` would then
+be wrong rather than merely incomplete. The assumption is stated at the top of
+that file so the next person meets it before the code.
+
+**The buffer widens the STRIDE, never the session (5.2).** A 30-minute session
+with a 10-minute buffer occupies 40 minutes of the day and bills for 30 —
+billing is per slot (ADR-024), so a buffer that lengthened the session would
+quietly overcharge. The fit test is against the session alone, so a window
+ending at 13:00 still yields a 12:30 slot: the buffer protects the *next*
+session and there is no next session. Requiring room for a trailing buffer
+would silently lose the last slot of every working day.
+
+**Overlapping windows are refused in the service, because MySQL cannot refuse
+them.** There are no exclusion constraints, so two windows covering the same
+minute would generate the same slot twice — and a duplicated slot is a double
+booking waiting for two customers to find it. Same class of gap as ADR-029's
+partial-index problem: the database will store what the domain forbids, so the
+check lives in code and is tested.
+
+**The weekly grid is replaced, not merged.** An editor shows the week as a
+whole and "these are my hours" is one statement; applying it as a series of
+adds and removes leaves a window where the grid is half old and half new, and a
+booking taken then is taken against hours nobody set. Validation runs before
+the delete, so a bad payload cannot clear the existing grid on its way to
+failing.
+
+**An unpublished, retired or fixture profile is NOT FOUND to the public**, not
+"no slots" — the same answer an unknown slug gets, so the endpoint cannot be
+used to discover which profiles exist but are unpublished.
+
+**Still open: 5.3.** Shrinking availability must not orphan an already-paid
+booking. There are no bookings yet, so there is nothing to orphan — this lands
+with Phase 6, and the rule belongs next to the booking model rather than
+guessed at now.
+
+---
+
+## ADR-046 — The booking schema, and the two MySQL facts that shape it
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Tasks:** 6.1, 6.2, 6.3, 6.4
+
+**Decision.** The `Booking` model lands before any booking code, because the
+parts of it that are wrong are the parts that cannot be fixed later.
+
+### 1. Slot uniqueness — the generated column (6.1)
+
+Implemented as ADR-029 specified: `slot_key` is a **STORED GENERATED** column,
+NULL for rows that do not occupy their slot, carrying a unique index. MySQL
+permits unlimited NULLs in a unique index, which is the filtered uniqueness it
+otherwise denies.
+
+**Occupying by default.** The expression lists the statuses that FREE the slot
+(`cancelled`, `expired`) rather than those that hold it, so a status added later
+occupies until someone decides otherwise. The failure mode of forgetting is then
+a slot that looks busy — visible and annoying — rather than one sold twice.
+
+**It cannot consult NOW().** Generated-column expressions must be
+deterministic, so an expired hold keeps its slot until the reaper flips the
+status. That is not a limitation to work around; it is what makes the hold
+durable rather than a clock the database reads (6.2).
+
+**Verified against MySQL, not reasoned about:** a second hold on the same slot
+is refused (P2002); a different astrologer at the same instant is allowed;
+after cancelling, `slot_key` goes NULL and the slot **rebooks** — the exact case
+a plain `UNIQUE(astrologer_id, slot_start)` would block for ever; and an
+expired hold releases the same way.
+
+**A MySQL restriction found the hard way.** A foreign key whose column feeds a
+stored generated column **cannot use CASCADE**. `astrologer_id` feeds
+`slot_key`, so Prisma's default `ON UPDATE CASCADE` fails with error **1215** —
+which reports as "cannot add foreign key constraint" and says nothing about
+generated columns. Proven by adding both variants by hand: CASCADE fails,
+RESTRICT succeeds, and the same CASCADE on `customer_id` (not a base column) is
+fine. `onUpdate: NoAction` is now in the schema so a regenerated migration keeps
+it. It costs nothing — ULIDs are never updated.
+
+### 2. The price snapshot and the tax columns (6.4)
+
+`price_paise` is frozen at creation and never recomputed (§79). Reading a past
+booking's price back through `astrologers.session_rate_paise` would rewrite
+every historical price the moment someone edits a rate.
+
+The **tax columns are present from this migration**, before anything computes
+them, because under pay-at-booking the invoice is issued at booking and adding a
+tax split to already-paid rows is the uncorrectable retrofit the plan exists to
+avoid. They are nullable **only** because the rate is unanswered (owner action
+O6: principal or agent for GST?). The invariant Phase 7 enforces: an unpaid held
+row may carry nulls; a confirmed one may not.
+
+`tax_rate_bp` is basis points — an integer. A percentage stored as a float is
+the same mistake as rupees stored as a float.
+
+### 3. Idempotency (6.3)
+
+`idempotency_key` is unique. The slot index protects the SLOT; this protects the
+CUSTOMER'S CARD. A double-click creating two Razorpay orders for one slot is the
+most likely launch incident.
+
+**Not yet built:** the booking service itself, reschedule (6.6), the overrun
+policy (6.7), the reaper (6.10). 6.8 needs 100ms (Phase 8), 6.9 needs a second
+admin (O5), 6.11 needs TRAI DLT.
+
+---
+
+## ADR-047 — 100ms: a room per consultation, tokens minted per request
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Implements:** ADR-005's seam
+
+**Decision.** `RealtimeProvider` is the seam; `HmsService` is the 100ms
+implementation. Booking and consultation code never names the vendor.
+
+**Verified against the live API**, not reasoned about: a room is created, join
+tokens are minted for both sides, and the room is disabled again. The account's
+credentials work.
+
+### Three things the existing account setup got wrong
+
+**1. One shared room.** The account had a single room, and its id was in
+`config.txt`. A consultation marketplace needs **a room per booking**: with one
+room, two concurrent consultations put four people in the same call. A customer
+would hear someone else's reading — a privacy breach and the most embarrassing
+possible bug. `createRoom` is called per consultation and the shared room id is
+deliberately **not** copied into the API environment.
+
+**2. The stored token had already expired** — `100MS_TOKEN` was a management
+token that lapsed on 2026-09-12 and could not have worked. Tokens are now minted
+per request from the app key and secret. A long-lived token sitting in a config
+file has no revocation story.
+
+**3. The template is a demo.** `AR-noisy-cake-417467` ships with the default
+100ms roles — `listener`, `moderator`, `speaker`. **A `listener` cannot speak**,
+so a customer given that role would sit mute through a reading they paid for.
+Both sides therefore default to `speaker`, and the mapping is environment-driven
+(`HMS_ROLE_ASTROLOGER`, `HMS_ROLE_CUSTOMER`) so a proper template can be adopted
+without a code change. **Owner action: create a template with roles that mean
+something here.**
+
+### The app secret never leaves the server
+
+It can mint a *moderator* token for any room on the account. The browser
+receives only a short-lived token scoped to one room, one user and one role.
+There is a test asserting the secret does not appear in a minted token, and it
+was confirmed to fail when a secret is deliberately added to the payload.
+
+Join tokens last four hours — long enough for a consultation plus a reconnect,
+short enough that a leaked link stops working the same day.
+
+### A naming trap worth recording
+
+The credentials are `100MS_*` in `config.txt`, and **a variable name cannot
+begin with a digit** — POSIX shells reject `100MS_APP_KEY=x` outright. They are
+`HMS_*` in every environment file. This is also why a scan of `config.txt` for
+`^[A-Za-z_]` missed the whole section.
+
+**Still not done: the Phase 1 spike (task 1.5).** 100ms has never been tested in
+mobile Safari or Chrome on a real handset on Indian 4G, and the entire web-only
+decision rests on it. Credentials working is not the same as WebRTC working on
+the target network. That needs physical devices and remains an owner action.
+
+---
+
+## ADR-048 — Recorded audio consultations: consent first, machines advise
+
+**Date:** 2026-09-15 · **Status:** Accepted in principle, **blocked on two owner
+decisions** · **Supersedes:** ADR-015's "recording off in V1"
+
+**Owner decision, 2026-09-15.** Consultations are audio-only, recorded, kept for
+one month, screened for abusive language, and assessed — with the outcome
+reported to the admin and the astrologer.
+
+This reverses ADR-015. That is the owner's call. What follows is what has to be
+true for it to be lawful and useful rather than a liability.
+
+### Already true
+
+**Audio-only needs no work.** The 100ms template publishes `audio` and `screen`;
+no role can publish video. Checked against the live template, not assumed.
+
+**Storage is built.** `stella-recordings` is a private R2 bucket with an
+**R2-enforced 30-day expiration rule** — deletion by the storage provider, not
+by a job we have to remember to run. Verified by reading the rule back and by
+confirming an unauthenticated request returns an error document rather than a
+listing. Its own bucket, separate from KYC and backups, so a token scoped to
+one cannot read the others (ADR-042).
+
+### Blocking: consent
+
+**A recording taken without consent is a liability, not an asset.** Under the
+DPDP Act a voice recording is personal data, and consultation audio is the most
+sensitive kind this business will ever hold — people tell astrologers about
+their health, their marriages and their money. Consent must be free, specific,
+informed, unambiguous, and withdrawable.
+
+So, before any recording is enabled:
+
+1. **Both parties are told, every time, before the recording starts** — the
+   customer and the astrologer. Not a line in a policy nobody opens.
+2. **Consent is a stored artifact with a policy version and a timestamp**, the
+   same shape as `leads.consent_at` / `consent_policy_version`. "They agreed"
+   without a record of what they agreed to is not consent.
+3. **Refusal is possible and does not cancel the consultation.** A consent that
+   cannot be declined is not consent; if recording is a condition of service,
+   that has to be stated plainly at booking, and it is a business decision, not
+   an engineering one.
+4. **Withdrawal deletes the recording**, and the DPDP erasure path
+   (ADR-040) must reach recordings, not just the lead row.
+
+**Owner action:** the consent wording, and whether a customer may decline and
+still be seen.
+
+### Blocking: what a machine may conclude about a person
+
+Abuse screening and "grading the talk" are judgments about named people — three
+of whom are the company's own directors. Two rules, and they are not
+negotiable engineering preferences:
+
+**1. A machine output is a FLAG FOR A HUMAN, never a finding.** Automated
+speech analysis on Hindi and regional languages, over astrology vocabulary, will
+produce false positives. Telling an astrologer that software judged them abusive
+is defamatory when it is wrong, and it will sometimes be wrong. Nothing reaches
+the astrologer until a named person has listened and decided.
+
+**2. The reviewer cannot be the subject.** At a roster of three, the astrologer
+being assessed is also the person who would review the assessment. This is the
+same four-eyes gap the plan already records for no-show adjudication (task 6.9,
+owner action O5), and it is unresolved.
+
+A "grade" delivered automatically to an astrologer's screen is an algorithmic
+judgment about someone's livelihood. It may be computed; it may not be
+published without review.
+
+**Owner action:** who reviews flagged calls, given they cannot be the astrologer
+concerned.
+
+### Also required, and not yet built
+
+- **A processor agreement** with whoever transcribes the audio. Sending
+  consultation recordings to a third party is a further disclosure and needs its
+  own consent line and a DPA. Choosing that vendor is not an engineering
+  decision.
+- **Recording is a paid 100ms feature** and the template has none configured
+  (`recording: {}`, `destinations.browserRecordings: {}`). Whether the plan
+  includes it is an account question.
+- **Access to recordings is audited** like every admin read of lead data
+  (ADR-031), and the audit must record who listened to whose consultation.
+
+### What is NOT deferred
+
+The bucket, its 30-day enforced expiry, and its isolation exist now, because
+they are the parts that are dangerous to add late: a recording written to the
+wrong bucket, or with no expiry, is one that outlives its lawful basis.
+
+
+---
+
+## ADR-049 — The recording pipeline, and the three gates it enforces
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Implements:** ADR-048
+
+**Decision.** `RecordingService` owns consent, recording, deletion and
+assessment. Three properties are **enforced in code and proven by mutation
+testing**, because each is something a reasonable person gets wrong under time
+pressure.
+
+### Gate 1 — no consent, no recording
+
+`startRecording` refuses unless **both** parties granted and **neither**
+withdrew. A missing row is refusal: never asked is not consent.
+
+It fails **loudly**, with a 409 naming the reason. A consultation that quietly
+is not being recorded looks identical to one that is, and nobody finds out
+which until it matters.
+
+A **refusal is stored**, not left blank. "They never replied" and "they said no"
+are different facts and only one is a decision.
+
+*Proven:* removing the gate fails three tests.
+
+### Gate 2 — a machine result is a draft
+
+`submitMachineAssessment` writes `machine_done`, which is a queue position, not
+a verdict. Only a human `review` can set `published`, and only `published` is
+visible to the astrologer — not even "pending", which would tell someone they
+are under suspicion without telling them of what.
+
+*Proven:* letting the machine write `published` fails a test.
+
+### Gate 3 — the reviewer may not be the subject
+
+`review` refuses when the reviewer's astrologer profile is the one being
+assessed. At a roster of three they are otherwise the only available reviewer,
+and adjudicating a complaint about yourself is not review — the same four-eyes
+gap as task 6.9 (owner action O5).
+
+The audit keeps **both** the machine result and the human verdict, so "the
+machine flagged abuse and a human disagreed" stays answerable.
+
+*Proven:* removing the check fails a test.
+
+### Deletion is deletion
+
+`deleteRecording` clears the object key and **returns it to the caller** to
+remove from R2. Marking a row deleted while the audio survives is theatre.
+
+`deleteForCustomer` extends the ADR-040 erasure path to audio. A customer who
+has had consultations has recordings of their voice, which are more sensitive
+than the address that path was built for; an erasure that leaves them is not
+one.
+
+`reconcileExpired` squares the database with R2's own 30-day lifecycle, so a row
+never points at a key the bucket has already removed.
+
+### No endpoints yet, deliberately
+
+Nothing exposes this over HTTP. Two owner decisions gate any route that could
+start a recording — the consent wording, and who reviews a flagged call.
+Shipping the endpoint first invites the mechanism being used before those
+answers exist, which is the failure this whole ADR is about.
+
+---
+
+## ADR-051 — Chat consultations: a human, per session, same record obligations
+
+**Date:** 2026-09-15 · **Status:** Accepted · **Owner decisions:** chat is
+offered; the other party is a **human astrologer** in a chat-style interface;
+charged **per session, like voice**
+
+This closes the Phase 8 blocker the plan recorded as "chat or voice for first
+revenue?" — the answer is **both**, sharing one booking model.
+
+**A named human, not software.** The interface borrows the chatbot idiom; the
+correspondent does not. `ChatMessage.sender` is `astrologer` or `customer` and
+nothing else — no `system`, no `bot` — because clause 1 of the Terms now states
+that a customer in a chat consultation is writing to a named human, and a
+machine-authored row in that table would make the Terms false. This also keeps
+CLAUDE.md §15 intact: AI never computes planetary positions.
+
+**Per session, which is why this was cheap.** Chat reuses the booking, the slot,
+the price snapshot and the availability model unchanged. The alternatives both
+had a cost the plan had already paid to avoid: per-message bundles are prepaid
+stored value, which is the wallet ADR-023 removed; per-minute reintroduces the
+metering ADR-024 removed and which the Terms had just been rewritten to
+eliminate.
+
+**The transcript is the record.** A voice consultation has an audio file; a chat
+consultation has its messages, and they carry the *same* retention, review and
+erasure obligations (Terms clause 10 says so explicitly). Two consequences:
+
+- **`RecordingAssessment` became `ConsultationAssessment`**, keyed to the
+  consultation rather than the artifact. Keying the review queue to `Recording`
+  would have meant a second, parallel pipeline for chat — and a second place
+  for "a machine result is only ever a draft" to be forgotten. The migration
+  drops the old table, which is safe *only* because it was empty in both
+  environments; verified by counting before writing the migration, and recorded
+  in it.
+- **Erasure had a hole.** `deleteForCustomer` iterated recordings, and a chat
+  consultation has no recording row at all, so it would have removed someone's
+  audio and left every word they typed. It now redacts transcripts too. Proven
+  by deleting that branch and watching the test fail.
+
+**Redaction empties bodies, keeps rows.** Who sent how many messages and when
+stays answerable for a dispute; the content does not. A dropped row would take
+the shape of the conversation with it.
+
+**One thing the Terms say plainly rather than pretending otherwise.** A chat
+consultation cannot happen without its messages being stored — the conversation
+*is* the writing. So clause 12 tells a customer who does not want a written
+record to book a voice consultation and decline recording, instead of offering a
+consent that could not meaningfully be refused.
+
+---
+
+## ADR-052 — Chat is billed per minute, and the four questions that reopens
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Owner decision** · **Partially
+supersedes ADR-024** — for chat only. **Voice remains slot-based.**
+
+ADR-024 chose slot billing *because* per-minute metering leaves four questions
+open — prorating, start/stop, pause/reconnect and chat inactivity — and slot
+billing dissolves all four by construction. Per-minute for chat reopens them, so
+each is answered explicitly in `billing/chat-billing.ts`, with the reasoning
+next to the constant, rather than falling out of whatever the code happened to
+do.
+
+| Question | Answer | Why |
+|---|---|---|
+| **Start** | The **astrologer's first message** | A customer waiting for the astrologer to appear is not receiving a consultation. Starting at the appointed time would bill them for the wait |
+| **Prorating** | Total seconds, **rounded up once**, at the end | Rounding each exchange separately charges six minutes for six ten-second replies. The difference between "we round up" and "we round up repeatedly" |
+| **Inactivity** | Up to **2 minutes of silence is charged**; beyond that is not | Reading and composing a reply is the consultation. Billing an hour because someone walked away is the most-complained-about behaviour in per-minute chat |
+| **Reconnect** | A drop under **90 seconds** does not stop the meter | Mobile networks drop constantly; ending a consultation on every blip would be worse than the blip |
+
+A minimum of one minute applies where the astrologer replied. Where they never
+replied, **there is no charge at all** — not a minimum for silence.
+
+Every expectation in the tests is hand-computed per ADR-036, and the two that
+matter most were confirmed to fail against the wrong implementation: rounding
+each interval separately, and billing all silence.
+
+### The consequence nobody asked about, and it is the important one
+
+**Per-minute billing cannot be collected at booking time, because the amount is
+not known then.** ADR-023 removed the wallet, so there is no balance to draw
+down. That leaves exactly two options, and one of them is a reversal of ADR-023.
+
+The design adopted here is **authorise-then-capture**: every chat consultation
+has a **maximum duration**, the gateway authorises `maxMinutes × rate` when the
+booking is confirmed, and only the metered amount is captured at the end. The
+customer sees the rate, the cap, and the worst case before agreeing.
+
+That is why `chatMaxMinutes` is not a nicety — **an authorisation needs a
+number**, so an uncapped per-minute chat is not chargeable without a wallet.
+`authorisationCeilingPaise` refuses a zero or negative cap for that reason.
+
+`bookings.price_paise` therefore means two different things by modality: the
+amount charged for voice, the **authorised ceiling** for chat, with
+`captured_paise` holding what was actually taken. Both are frozen at creation
+(§79); neither is ever recomputed from the astrologer's current rate.
+
+**Still open, and it is an owner decision:** whether Razorpay's authorise-then-
+capture flow is acceptable for this volume, or whether a prepaid balance is
+preferred after all. A prepaid balance *is* a wallet and reverses ADR-023,
+which three plan reviews removed for its regulatory weight. This ADR assumes
+authorise-then-capture and does not implement either — payments are Phase 7.
+
+`DESIGN.md` §9 is narrowed accordingly: per-minute may now be advertised for
+chat, **but only alongside the maximum duration and the maximum total charge**,
+because a per-minute price with no visible ceiling is the shape customers most
+reliably misread.
+
+
+---
+
+## ADR-053 — Availability may not strand a paid booking (5.3), and astrologers edit their own hours (4.2)
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Closes:** tasks 4.2 and 5.3
+
+### 5.3 — the guard
+
+`replaceRules` and `addBlock` now refuse a change that would leave a **paid**
+booking outside the astrologer's available hours. A customer who paid for
+Tuesday 10:00 must not discover that Tuesdays were removed and nobody told
+either of them.
+
+**Confirmed is the line; held is not.** A confirmed booking has been paid for.
+A held booking is someone mid-checkout, and an unpaid hold lapses on its own —
+blocking an astrologer from changing their own hours over one would be worse
+than the hold being stranded. Held bookings are therefore allowed through.
+
+**Past bookings are ignored.** A consultation that already happened cannot be
+orphaned by tomorrow's schedule, and refusing on those grounds would freeze the
+calendar permanently.
+
+**The refusal names the bookings.** An operator who cannot see *which* slots are
+in the way cannot act on the refusal, and will eventually route around it.
+
+**Coverage reuses `generateSlots`' own test.** `isCovered` applies the same
+window-and-block logic that creates a slot, so a booking is covered exactly when
+the current rules would still produce it — not by a looser second definition
+that could drift from the first.
+
+**This was deferred as "waits for Phase 6" and that had quietly stopped being
+true.** The `Booking` model landed with 6.1–6.4; the guard was buildable from
+that moment, and `availability.service` mentioned bookings only in comments.
+Verified end to end against the API: dropping the booked weekday returns 409
+naming the slot, keeping it returns 200, and a block placed over the slot
+returns 409.
+
+### 4.2 — the editor
+
+`/astrologer` now carries a weekly-hours editor. Until now the endpoints existed
+but no screen did, so a practitioner could not set their own hours — only an
+admin could, by calling the API. The page had been saying availability was
+"being built" since Phase 4.
+
+**No timezone conversion happens in the editor.** Minutes-from-midnight in,
+minutes-from-midnight out, labelled India Standard Time. A conversion here would
+be a second place for the offset to be applied, and applying it twice is how a
+schedule slips by five and a half hours.
+
+**The 409s are surfaced verbatim.** Both the overlap refusal and the 5.3 refusal
+carry a message that names the problem; showing "conflict" instead would throw
+away the only useful part.
+
+Availability loads in its own `try`, so a failure costs the editor rather than
+the whole page — the profile above it is still worth showing.
+
+---
+
+## ADR-054 — The booking lifecycle: holds, idempotency, reschedule and the reaper
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Closes:** tasks 6.2, 6.3, 6.6, 6.10
+
+Phase 6 had its schema and nothing else. The `Booking` model, the generated
+slot-occupancy column and the tax columns all landed on 2026-09-15, and until
+today **nothing in the product could create a booking** — the only rows in the
+table were ones I had inserted by hand to test the 5.3 guard.
+
+### The state machine, and where it is enforced
+
+```
+held ──confirm──▶ confirmed ──▶ completed | no_show
+ │  └──reaper───▶ expired
+ └──cancel──▶ cancelled       confirmed ──cancel──▶ cancelled
+```
+
+`BookingsService` is the only place a booking changes state. Two invariants
+carry the module, and neither is enforced by being careful:
+
+1. **One occupying booking per slot** is enforced by the unique index on the
+   generated `slot_key` column (ADR-029), *not* by the availability check that
+   precedes it. Everything that reads "check, then insert" in that file is a
+   courtesy that produces a civil error message; the `catch` around the insert
+   is the guard. Verified by mutation: removing the P2002 handler fails two
+   tests.
+2. **The price is frozen at creation** (§79). Nothing recomputes it — not on
+   reschedule, not on confirm. Reading it back through
+   `astrologers.session_rate_paise` would rewrite the price of every past
+   booking the moment somebody edited a rate.
+
+### 6.2 — the hold is the database row
+
+Fifteen minutes, because the hold has to outlive the **entire** Razorpay flow
+and a UPI collect request pends for minutes while the customer opens a banking
+app. The instinct is a short TTL, as if this were a cache. It is not: a hold
+that lapses while the customer is authorising takes money for a slot somebody
+else now owns.
+
+### 6.3 — the idempotency key is required, not optional
+
+A double-click creating two Razorpay orders for one slot is the most likely
+incident at launch. An optional guard is one the client omits on the day it
+matters, so `POST /bookings` returns 400 without an `Idempotency-Key` header.
+The slot index protects the **slot**; this protects the **customer's card**.
+
+### 6.6 — reschedule is ONE UPDATE, not create-then-cancel
+
+The plan says to acquire the new slot before releasing the old and never the
+reverse. A single `UPDATE` of `slot_start` is the strongest form of that: MySQL
+recomputes the generated `slot_key` inside the same statement, so either the new
+slot was free and the move happened, or the unique index rejected the whole
+statement and the booking still holds its **original** slot. There is no instant
+at which the customer holds neither, and none at which they hold both.
+
+Moving the row also keeps the price snapshot, the payment linkage and the
+booking id attached to the thing the customer thinks of as their booking. A new
+row would need the price copied across, and a copied price snapshot is a
+recomputed price waiting to happen.
+
+Limits are policy, not physics, and O4 may move them: **3 moves**, and none
+inside **120 minutes** of the start — because moving a booking ten minutes
+before it begins strands an astrologer already sitting at a microphone.
+
+### 6.10 — the reaper
+
+Every minute, row by row rather than one `updateMany`: each expiry returns a
+slot to sale and belongs in the audit log as its own event. The `WHERE` clause
+re-checks `status = 'held'` and the audit row is written in the same
+transaction, so **a payment that confirms the booking mid-sweep wins** — the
+update matches nothing and nothing is recorded. An audit row saying a paid
+booking expired would be a permanent, unerasable lie.
+
+Running it rarely would make the effective hold longer than the advertised one.
+"Your slot is held for 15 minutes" has to be true in the direction that costs
+the business, not only the one that costs the customer.
+
+### Two decisions that look small
+
+**`modality` is a column, not a derivation.** It could have been read off
+`chat_rate_per_minute_paise IS NULL`. That trick works until someone stores a
+rate on a voice booking for reference, and then every reader of the table is
+quietly wrong. It is chosen at *booking* because it decides which price snapshot
+is taken: voice freezes an amount, chat freezes an authorised ceiling (ADR-052).
+
+**A chat authorisation is clamped to the slot.** A 30-minute slot with
+`chatMaxMinutes` of 45 would otherwise authorise a chat running a quarter of an
+hour into the next customer's time. The astrologer profile is the real defect
+there, and the clamp is logged as a warning naming the astrologer so the
+misconfiguration is visible rather than absorbed.
+
+### There is deliberately NO customer-facing confirm route
+
+A booking becomes confirmed when Razorpay says the money arrived. The server is
+authoritative for payment success (§78), and a client that can declare payment
+is a client that can book for free. `confirm()` exists as a service method with
+Phase 7's webhook as its only intended caller, and it **refuses without the tax
+split**, per the schema's own invariant: an unpaid held row may carry nulls, a
+paid one may not.
+
+It deliberately does **not** consult the hold clock. A payment that lands a
+second after the hold lapsed still wins, because refusing after taking the money
+is worse than honouring a slightly stale hold. If the reaper has already flipped
+the row, the status check fails loudly instead — the slot may have been resold,
+and Phase 7 must refund rather than double-book.
+
+### Two defects the live endpoint found that the unit tests did not
+
+Both were caught by exercising the real API against the real database, and
+neither would have been caught by any test I had written.
+
+1. **A double-click was told its own booking had just been taken.** The
+   occupancy check ran before the idempotency layer, so the retry was refused by
+   the row the first request had created. A client surfacing that honestly would
+   send the customer to pick a different slot, and they would end up with two
+   bookings — the exact incident 6.3 exists to prevent. Fixed with a replay
+   lookup that runs first, **scoped to the caller**: `idempotency_key` is
+   globally unique on the table, so an unscoped lookup would have handed
+   somebody else's booking to anyone who guessed a key.
+
+2. **The public slot list offered slots that were already sold.** `generateSlots`
+   knows only about rules and blocks — it describes when an astrologer *works*,
+   not when they are *free* — so every customer picking a booked time was told
+   to choose again. Not a safety problem (the unique index is what prevents the
+   double booking) but the difference between a calendar and a lottery.
+   `slotsFor` now filters occupied slots out.
+
+The second fix made the first's occupancy query unreachable, which would have
+left dead code with a passing test beside it. Occupancy is therefore checked
+**before** availability, so a sold slot can still say "that time has just been
+taken" — true, actionable, and different from "that is not a time this
+astrologer works".
+
+### Verified
+
+Seventeen mutations, each removing one guard, each failing at least one test.
+Then end to end against the running API and a real MySQL: hold, replay the same
+key (same id, no second row), the slot leaving and re-entering the public list,
+a second customer refused, reschedule, a stranger's reschedule returning 404
+rather than 403, cancel, and **rebooking the cancelled slot** — the test that
+catches the MySQL partial-index mistake. Finally the reaper, on its own cron: a
+backdated hold flipped to `expired`, `slot_key` became NULL, the slot returned
+to the public list and was rebooked.
+
+The audit rows carry ids, times and amounts and no personal data (ADR-040),
+checked against the test accounts' addresses.
+
+---
+
+## ADR-055 — Razorpay: authorise, check, then capture. And the live key stays out of development
+
+**Date:** 2026-09-16 · **Status:** Accepted · **Covers:** tasks 7.1, 7.2 (partial)
+
+The owner pointed at `config.txt` for the Razorpay credentials. What is in it is
+`RAZOR_MID`, `RAZOR_LIVE_KEY` (`rzp_live_…`), `RAZOR_LIVE_SECRET` and a
+reference to `rzp-key.csv` that is not on this machine. **There is no test key
+and no webhook secret**, and per `CREDENTIAL_ROTATION.md` the live pair is still
+the one that was exposed in the web docroot — rotation was deferred by owner
+decision on 2026-09-06 and has never been carried out.
+
+### The live-key guard is the most important thing in this work
+
+`RazorpayService` refuses to construct with an `rzp_live_` key unless
+`APP_ENV=production`, and refuses an `rzp_test_` key in production.
+
+The first direction is the one that does damage. Every payment integration gets
+built by making it work locally first, and "make it work locally" with the only
+key on hand means the first successful test is a real charge on a real card, the
+first bug is a real double charge, and the first cleanup is a real refund with a
+gateway fee that is not returned. **A live key works perfectly in development**,
+which is precisely why nothing else would catch it. Same posture as the
+`is_dev_fixture` boot guard: downtime over contaminated data, except here the
+contamination is somebody's bank statement.
+
+An **unprefixed** key is allowed through. Razorpay has used other formats, and a
+guard that refuses an unrecognised shape is one that takes the site down over a
+vendor naming change. Only a key that positively identifies itself as belonging
+elsewhere is refused.
+
+### Authorise, check the slot, then capture
+
+Orders are created with `payment_capture: 0`, so an authorised payment is money
+**reserved**, not money **taken**.
+
+That matters because a hold can lapse while the customer is inside a banking
+app. With auto-capture the outcome is "charged, then refunded, minus a gateway
+fee that is not returned". Without it, the webhook arrives, the server sees the
+booking is no longer `held`, declines to capture, and the authorisation lapses —
+**the customer is never charged at all**. The difference is one flag.
+
+It is also the mechanism ADR-052 needs for chat, where the authorised amount is
+a ceiling and the captured amount comes from the meter.
+
+**Capture happens before confirm**, and the order is not arbitrary. Capture is
+the step that can fail. Confirming first would leave a booking marked paid with
+no money behind it, and that row is indistinguishable from a genuinely paid one
+for ever afterwards. The other way round the worst case is money taken with the
+booking still `held` — which the audit trail shows and a human can resolve.
+
+### What is never trusted
+
+The webhook's **amount** is checked against the price *we* froze at booking, and
+a mismatch refuses rather than reconciles. A signature proves the message came
+from Razorpay; it does not prove the message agrees with our own record.
+
+Order of operations in the handler is itself the security property: verify the
+signature over the **raw body**, before parsing, before any lookup, before
+touching the database — then deduplicate on the gateway's event id, then act. A
+forged `payment.authorized` would confirm a booking nobody paid for.
+
+The raw body matters concretely. Re-serialising parsed JSON changes whitespace
+and key order, the signature stops matching for reasons unrelated to
+authenticity, and the usual response to that is to stop checking. `main.ts` now
+boots with `rawBody: true`.
+
+### 7.2 — the tax split refuses rather than guesses
+
+`splitInclusive` treats the price as **tax-inclusive**, because that is what the
+customer was shown: ₹999 on the profile has to be ₹999 on the card statement.
+
+**The tax is a subtraction, not a second multiplication.** Computing both halves
+independently and rounding each lets them fail to sum to the price — off by a
+paisa on some prices and not others, which survives every manual check and then
+fails reconciliation at volume. Deriving one from the other makes
+`taxableValue + tax === price` true by construction, and a sweep asserts it.
+
+**The rate, the SAC code and principal-versus-agent have no defaults.** All
+three are owner action O6, with the CA, and `PaymentsService` refuses to create
+an order without them. An invented rate would be a wrong GST figure on a real
+invoice — a filing problem, not a bug, and uncorrectable on a paid row (§79).
+
+### Two things caught by running it rather than testing it
+
+**A dependency-injection failure that every unit test missed.** `RazorpayService`
+takes the environment as a constructor argument so it can be tested without
+mutating `process.env`. NestJS reads constructor parameter types from
+`emitDecoratorMetadata` and tries to resolve that `NodeJS.ProcessEnv` as a
+provider — **a default value does not stop it** — and the app died at boot with
+"can't resolve dependencies (?)". Every test passed throughout, because they
+construct the class directly and never go through the container. Fixed with a
+`useFactory`.
+
+**My first boot test proved nothing.** It asserted the process exited non-zero
+with a live key, and it did — because of the DI bug above, not the guard. Both
+the "refuses" cases and the "starts" control case failed identically. A guard
+test needs the control case to pass, or it is measuring whether the binary runs.
+
+### One property that a unit test cannot observe
+
+Replacing `timingSafeEqual` with `===` changes no observable behaviour — the
+same signatures pass and fail — so it was the sole survivor of thirteen
+mutations. What it changes is how long the comparison takes in proportion to how
+many leading bytes matched, which leaks enough to forge a signature given
+attempts. Timing measurements inside a test are far too noisy to assert on, so
+`timing-safe.spec.ts` asserts on the **mechanism** instead, mocking
+`node:crypto` to confirm the comparison routes through `timingSafeEqual`. That
+couples the test to the implementation deliberately: here the implementation is
+the requirement.
+
+### Verified
+
+Thirteen mutations, each removing one guard, each failing at least one test.
+Three boot cases against the real binary: a live key under development refuses
+and names the fix, a test key under production refuses, a test key under
+development starts.
+
+**Not verified, and cannot be until the owner acts:** no order has been created
+against Razorpay and no webhook has been received, because there is no test key
+and no webhook secret. Everything above is unit-verified and boot-verified.
+A green test is not evidence that the integration works.

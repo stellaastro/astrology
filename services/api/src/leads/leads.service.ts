@@ -103,7 +103,18 @@ export class LeadsService {
           action: 'lead.create',
           targetType: 'Lead',
           targetId: created.id,
-          after: { email: created.email, locale: created.locale, bypassed },
+          /*
+           * NO EMAIL HERE, DELIBERATELY. targetId already identifies this lead,
+           * so the address added nothing the lead row did not already hold —
+           * and it is the one thing that would have made DPDP erasure
+           * impossible, because the audit log is append-only. Erasing the lead
+           * row while its address sat in an immutable audit event would have
+           * made "we have deleted your data" a false statement.
+           *
+           * Data minimisation is not a nicety here: it is what lets erasure be
+           * honest later (ADR-040).
+           */
+          after: { locale: created.locale, bypassed },
           actor: { ip },
         });
       });

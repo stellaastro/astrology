@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import SignOut from './SignOut';
+import AdminNav from './AdminNav';
 import s from './admin.module.css';
 
 /**
@@ -86,16 +87,24 @@ export default async function AdminPage({
   const confirmed = data.leads.filter((l) => l.confirmedAt).length;
 
   return (
-    <div className="page" lang="en">
-      <div className="wrap">
-        <div className={s.head}>
-          <div>
-            <p className="eyebrow">Waitlist</p>
-            <h1 className="pageTitle">{data.total} {data.total === 1 ? 'person' : 'people'}</h1>
+    <>
+      <div className="masthead" lang="en">
+        <div className="wrap">
+          <div className={s.head}>
+            <div>
+              <p className="eyebrow">Waitlist</p>
+              <h1 className="pageTitle">{data.total} {data.total === 1 ? 'person' : 'people'}</h1>
+            </div>
+            <SignOut />
           </div>
-          <SignOut />
+          {/* Without this the waitlist is a dead end: the astrologers screen
+              exists but nothing links to it. */}
+          <AdminNav />
         </div>
+      </div>
 
+      <div className="page" lang="en">
+      <div className="wrap">
         <p className={s.summary}>
           {confirmed} of {data.leads.length} shown have confirmed their address.
           Only confirmed addresses are contactable.
@@ -154,6 +163,7 @@ export default async function AdminPage({
           your IP address. Downloading the CSV is recorded separately.
         </p>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

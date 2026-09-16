@@ -6,16 +6,53 @@ const makeOutbox = () => ({
   parked: vi.fn(async () => 0),
 });
 const makeIdem = () => ({ purgeExpired: vi.fn(async () => 0) });
+const makeRetention = () => ({
+  purge: vi.fn(async () => ({ unconfirmedLeads: 0, confirmedLeads: 0, outboxMessages: 0, privacyRequests: 0 })),
+});
+const makeBookings = () => ({ expireHolds: vi.fn(async () => ({ expired: 0 })) });
 
 describe('SchedulerService', () => {
   let outbox: ReturnType<typeof makeOutbox>;
   let idem: ReturnType<typeof makeIdem>;
+  let retention: ReturnType<typeof makeRetention>;
+  let bookings: ReturnType<typeof makeBookings>;
   let svc: SchedulerService;
 
   beforeEach(() => {
     outbox = makeOutbox();
     idem = makeIdem();
-    svc = new SchedulerService(outbox as never, idem as never);
+    retention = makeRetention();
+    bookings = makeBookings();
+    svc = new SchedulerService(outbox as never, idem as never, retention as never, bookings as never);
+  });
+
+  it('runs the retention purge on tick', async () => {
+    await svc.purgeExpiredData();
+    expect(retention.purge).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * Every job in here swallows its own errors. An unhandled rejection inside a
+   * cron callback takes the process down, and with it the site — so a failed
+   * purge must be a logged failure, never an outage.
+   */
+  it('does not let a failing purge take the process down', async () => {
+    retention.purge.mockRejectedValueOnce(new Error('database is on fire'));
+    await expect(svc.purgeExpiredData()).resolves.toBeUndefined();
+  });
+
+  it('reaps abandoned holds on tick (task 6.10)', async () => {
+    await svc.expireAbandonedHolds();
+    expect(bookings.expireHolds).toHaveBeenCalledOnce();
+  });
+
+  /*
+   * The reaper runs every minute. A throw here would be a crash loop a minute
+   * wide, so this is the job where swallowing matters most.
+   */
+  it('does not let a failing reaper take the process down', async () => {
+    bookings.expireHolds.mockRejectedValueOnce(new Error('database is on fire'));
+    await expect(svc.expireAbandonedHolds()).resolves.toBeUndefined();
   });
 
   it('dispatches the outbox on tick', async () => {

@@ -37,7 +37,18 @@
 
 /* A table is the right shape for this data. It scrolls inside its own box so
    the PAGE never scrolls sideways. */
-.scroll { overflow-x: auto; margin-top: var(--s3); }
+/* The table sits on its own surface so it reads as a document rather than as
+   rows floating on the page ground. overflow-x stays: DESIGN.md allows a table
+   its own horizontal scroll container, and it is the only thing that keeps a
+   five-column table usable at 400px without shrinking the text. */
+.scroll {
+  overflow-x: auto;
+  margin-top: var(--s3);
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
 
 .table { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
 
@@ -94,3 +105,65 @@
   color: var(--ink-soft);
   font-size: var(--step--1);
 }
+
+/* ── Section navigation ──────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin-top: var(--s3);
+}
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--step--1);
+}
+.navLink:visited { color: var(--ink); }
+.navLink:hover { background: var(--cream); }
+/* The current page is marked by weight and a solid rule, not by colour alone —
+   colour alone fails for anyone who cannot distinguish it (DESIGN.md §8). */
+.navLinkCurrent {
+  border-color: var(--ink);
+  font-weight: 500;
+}
+
+/* ── Astrologer admin ────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: .1rem .5rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.badgeDraft   { color: var(--ink-soft); }
+.badgeLive    { color: var(--leaf); border-color: var(--leaf); }
+.badgeRetired { color: var(--ink-soft); background: var(--cream); }
+
+.rowActions {
+  display: flex;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+.action {
+  min-height: var(--tap);
+  padding: 0 .9rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+.action:hover:not(:disabled) { background: var(--cream); }
+.action:disabled { cursor: default; opacity: .55; }
+.action:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
